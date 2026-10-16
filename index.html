@@ -1,18 +1,25 @@
 <!DOCTYPE html>
-<html lang="id" class="dark">
+<html lang="id">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="description" content="Aplikasi Absensi & Daily Task Pribadi" />
-  <meta name="theme-color" content="#4f46e5" />
+  <meta name="description" content="HadirKu - Absensi Mudah, Kerja Lebih Bermakna" />
+  <meta name="theme-color" content="#168C85" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AbsensiKu - Absensi & Daily Tasks</title>
-  
-  <!-- Manifest for PWA (Installable on Android / iOS / Desktop) -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>HadirKu - Absensi Mudah, Kerja Lebih Bermakna</title>
+
+  <!-- PWA Manifest & Favicon -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
+
+  <!-- Supabase JS Client & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+
+  <!-- html2pdf.js CDN for Official PDF Reports -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -22,12 +29,17 @@
       theme: {
         extend: {
           colors: {
-            brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
+            hadir: {
+              navy: '#142D4E',
+              teal: '#168C85',
+              accent: '#14BBA6',
+              'teal-light': '#E6F7F6',
+              success: '#16845B',
+              danger: '#DC4545',
+              warning: '#F59E0B',
+              bg: '#F5F7FA',
+              dark: '#172B4D',
+              muted: '#64748B'
             }
           }
         }
@@ -41,364 +53,906 @@
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white pb-20 sm:pb-8">
+<body class="bg-[#F5F7FA] text-[#172B4D] min-h-screen flex flex-col font-sans antialiased selection:bg-[#168C85] selection:text-white pb-28 transition-colors">
 
-  <!-- Mobile-Friendly App Header -->
-  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
-    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-          <i data-lucide="check-square" class="w-5 h-5 text-white"></i>
-        </div>
-        <div>
-          <h1 class="font-bold text-base leading-tight tracking-tight flex items-center gap-1.5">
-            AbsensiKu
-            <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">Personal</span>
-          </h1>
-          <p id="headerDateText" class="text-[11px] text-slate-400">Memuat tanggal...</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <!-- Dark/Light Mode Switcher -->
-        <button id="themeToggleBtn" type="button" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition" title="Ganti Tema">
-          <i id="themeIcon" data-lucide="sun" class="w-4 h-4"></i>
-        </button>
-
-        <!-- Install PWA Button -->
-        <button id="installPwaBtn" type="button" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/30 transition">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span>Pasang App</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container (Centered & optimized for mobile view width) -->
-  <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-5 space-y-5">
-
-    <!-- 1. Card Jam & Status Kehadiran Hari Ini -->
-    <div class="bg-gradient-to-br from-slate-900 via-slate-900/90 to-indigo-950/40 rounded-3xl border border-slate-800 p-5 shadow-2xl relative overflow-hidden">
-      <!-- Glow background -->
-      <div class="absolute -top-16 -right-16 w-40 h-40 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
-
-      <!-- Top Row: Greeting & Badge Status -->
-      <div class="flex items-center justify-between mb-3">
-        <span id="greetingText" class="text-xs font-semibold text-indigo-400 flex items-center gap-1.5">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-          Selamat Datang
-        </span>
-        <span id="todayStatusPill" class="text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-          Belum Absen
-        </span>
-      </div>
-
-      <!-- Digital Clock Display -->
-      <div class="text-center py-2">
-        <div id="liveClock" class="font-mono text-5xl sm:text-6xl font-extrabold tracking-tight text-white drop-shadow">
-          00:00:00
-        </div>
-        <div id="fullDateDisplay" class="text-xs sm:text-sm text-slate-400 mt-1.5 font-medium">
-          Memuat hari...
-        </div>
-      </div>
-
-      <!-- Live Working Duration Counter (Active when Clocked In) -->
-      <div id="workingTimerContainer" class="hidden mt-3 p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl">
-        <div class="flex items-center justify-between text-xs mb-1">
-          <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            Sedang Bekerja
-          </span>
-          <span class="text-slate-400 text-[11px]">Durasi Berjalan</span>
-        </div>
-        <div id="activeDurationTimer" class="font-mono text-2xl font-bold text-emerald-300">
-          00j 00m 00d
-        </div>
-      </div>
-
-      <!-- Info Jam Masuk & Jam Pulang -->
-      <div class="mt-4 grid grid-cols-2 gap-2.5 text-xs">
-        <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-          <div class="text-slate-400 flex items-center gap-1.5 text-[11px]">
-            <i data-lucide="log-in" class="w-3.5 h-3.5 text-indigo-400"></i> Jam Masuk
-          </div>
-          <div id="todayClockInText" class="font-bold text-base text-slate-100 mt-1 font-mono">--:--</div>
-        </div>
-        <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-          <div class="text-slate-400 flex items-center gap-1.5 text-[11px]">
-            <i data-lucide="log-out" class="w-3.5 h-3.5 text-rose-400"></i> Jam Pulang
-          </div>
-          <div id="todayClockOutText" class="font-bold text-base text-slate-100 mt-1 font-mono">--:--</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Form Kontrol Absensi (Pilih Status & Tombol Aksi) -->
-    <div class="bg-slate-900/80 rounded-3xl border border-slate-800/90 p-5 shadow-xl space-y-4">
-      <div>
-        <label class="block text-xs font-semibold text-slate-300 mb-2">Pilih Status Hari Ini:</label>
-        <div class="grid grid-cols-5 gap-1.5" id="statusButtonGroup">
-          <button type="button" data-status="Hadir (WFO)" class="status-btn active-status flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer">
-            <i data-lucide="building-2" class="w-4 h-4 mb-1"></i>
-            <span>WFO</span>
-          </button>
-          <button type="button" data-status="WFH" class="status-btn flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer">
-            <i data-lucide="home" class="w-4 h-4 mb-1"></i>
-            <span>WFH</span>
-          </button>
-          <button type="button" data-status="Izin" class="status-btn flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer">
-            <i data-lucide="file-text" class="w-4 h-4 mb-1"></i>
-            <span>Izin</span>
-          </button>
-          <button type="button" data-status="Cuti" class="status-btn flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer">
-            <i data-lucide="palmtree" class="w-4 h-4 mb-1"></i>
-            <span>Cuti</span>
-          </button>
-          <button type="button" data-status="Sakit" class="status-btn flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer">
-            <i data-lucide="stethoscope" class="w-4 h-4 mb-1"></i>
-            <span>Sakit</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Action Buttons (Clock In / Clock Out / Leave) -->
-      <div>
-        <div id="workingActionButtons" class="grid grid-cols-2 gap-2.5">
-          <button id="clockInBtn" type="button" class="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
-            <i data-lucide="log-in" class="w-4 h-4"></i>
-            <span>Absen Masuk</span>
-          </button>
-
-          <button id="clockOutBtn" type="button" disabled class="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl font-bold text-sm text-white bg-rose-600 hover:bg-rose-500 active:scale-95 shadow-lg shadow-rose-600/30 transition disabled:opacity-40 disabled:bg-slate-800 disabled:shadow-none disabled:cursor-not-allowed">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
-            <span>Absen Pulang</span>
-          </button>
-        </div>
-
-        <div id="leaveActionButton" class="hidden">
-          <button id="logLeaveBtn" type="button" class="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl font-bold text-sm text-white bg-amber-600 hover:bg-amber-500 active:scale-95 shadow-lg shadow-amber-600/30 transition">
-            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-            <span id="logLeaveBtnText">Catat Izin Hari Ini</span>
-          </button>
-        </div>
-
-        <!-- Today Complete Notice -->
-        <div id="todayCompletedActions" class="hidden flex items-center justify-between text-xs text-slate-400 pt-2">
-          <span class="flex items-center gap-1.5 text-emerald-400 font-medium">
-            <i data-lucide="check-check" class="w-4 h-4"></i>
-            Absensi hari ini sudah lengkap tercatat.
-          </span>
-          <button id="editTodayEntryBtn" type="button" class="text-indigo-400 hover:underline flex items-center gap-1 font-semibold">
-            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Koreksi Jam
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Daily Task Planner Hari Ini (Opsi A: To-Do Checklist + Progress) -->
-    <div class="bg-slate-900/80 rounded-3xl border border-slate-800/90 p-5 shadow-xl space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-sm font-bold text-white flex items-center gap-2">
-            <i data-lucide="list-todo" class="w-4 h-4 text-indigo-400"></i>
-            Target Task Hari Ini
-          </h2>
-          <p class="text-[11px] text-slate-400 mt-0.5">Catat apa saja yang ingin lu selesaikan hari ini</p>
-        </div>
-        <span id="taskProgressBadge" class="text-xs px-2.5 py-1 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700">
-          0/0 Selesai
-        </span>
-      </div>
-
-      <!-- Task Progress Bar -->
-      <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-        <div id="taskProgressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full w-0 transition-all duration-300"></div>
-      </div>
-
-      <!-- Task Input Form -->
-      <form id="addTaskForm" class="flex gap-2">
-        <input 
-          type="text" 
-          id="newTaskInput" 
-          placeholder="Tulis task baru... (misal: Selesaikan report sprint)" 
-          class="flex-1 bg-slate-950 border border-slate-700/80 rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+  <!-- ========================================== -->
+  <!-- 1. SPLASH SCREEN (Dengan Aset Gambar)      -->
+  <!-- ========================================== -->
+  <div id="splashScreen" class="fixed inset-0 z-50 bg-[#142D4E] flex flex-col items-center justify-center p-6 text-white transition-opacity duration-500 overflow-hidden">
+    <div class="max-w-xs w-full flex flex-col items-center text-center space-y-4 animate-pop-in">
+      <!-- Splash Image Container (Bisa diganti fotonya di assets/splash.svg / splash.png) -->
+      <div class="w-full max-w-[260px] rounded-3xl overflow-hidden shadow-2xl">
+        <img 
+          id="splashImageEl" 
+          src="assets/splash.svg" 
+          alt="HadirKu Splash" 
+          class="w-full h-auto object-contain rounded-3xl"
+          onerror="this.src='icon.svg';"
         />
+      </div>
+      <div class="flex items-center gap-2 pt-2">
+        <div class="w-4 h-4 border-2 border-[#14BBA6] border-t-transparent rounded-full animate-spin"></div>
+        <span class="text-xs text-slate-300 font-medium">Memuat HadirKu...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 2. LOGIN SCREEN                            -->
+  <!-- ========================================== -->
+  <div id="authSection" class="hidden min-h-screen flex flex-col justify-between py-10 px-6 max-w-md w-full mx-auto">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-[#168C85] flex items-center justify-center text-white font-bold text-sm">
+          <i data-lucide="check" class="w-5 h-5"></i>
+        </div>
+        <span class="font-extrabold text-lg text-[#142D4E]">HadirKu</span>
+      </div>
+      <button id="openConfigBtnAuth" type="button" class="text-xs text-[#168C85] font-semibold bg-[#E6F7F6] px-3 py-1.5 rounded-xl border border-[#168C85]/20 flex items-center gap-1.5" title="Pengaturan Supabase">
+        <i data-lucide="database" class="w-3.5 h-3.5"></i>
+        <span>Database</span>
+      </button>
+    </div>
+
+    <div class="my-auto py-8 space-y-6">
+      <div class="text-center space-y-1.5">
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-[#E6F7F6] text-[#168C85] flex items-center justify-center mb-4 shadow-sm">
+          <i data-lucide="user-check" class="w-8 h-8"></i>
+        </div>
+        <h2 class="text-2xl font-extrabold text-[#142D4E]">Selamat datang!</h2>
+        <p class="text-xs text-[#64748B]">Silakan masuk untuk melanjutkan absensi</p>
+      </div>
+
+      <!-- Auth Switcher Tabs -->
+      <div class="flex rounded-xl bg-slate-200/70 p-1 text-xs font-semibold">
+        <button id="tabLoginBtn" type="button" class="flex-1 py-2.5 rounded-lg bg-white text-[#142D4E] shadow-sm font-bold transition">
+          Masuk
+        </button>
+        <button id="tabRegisterBtn" type="button" class="flex-1 py-2.5 rounded-lg text-[#64748B] hover:text-[#142D4E] transition">
+          Daftar Akun Baru
+        </button>
+      </div>
+
+      <form id="authForm" class="space-y-4">
+        <div>
+          <label for="authEmail" class="block text-xs font-semibold text-[#172B4D] mb-1.5">Username / Email:</label>
+          <input 
+            type="email" 
+            id="authEmail" 
+            required 
+            placeholder="Masukkan username atau email" 
+            class="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm text-[#172B4D] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#168C85] focus:border-transparent transition"
+          />
+        </div>
+
+        <div>
+          <label for="authPassword" class="block text-xs font-semibold text-[#172B4D] mb-1.5">Password:</label>
+          <div class="relative">
+            <input 
+              type="password" 
+              id="authPassword" 
+              required 
+              minlength="6"
+              placeholder="Masukkan password" 
+              class="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm text-[#172B4D] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#168C85] focus:border-transparent transition pr-10"
+            />
+            <button type="button" id="togglePasswordBtn" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
         <button 
+          id="authSubmitBtn" 
           type="submit" 
-          class="px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-xs font-bold text-white shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition flex-shrink-0"
+          class="w-full h-12 rounded-xl font-bold text-sm text-white bg-[#142D4E] hover:bg-[#0F172A] active:scale-[0.98] shadow-lg shadow-[#142D4E]/20 transition flex items-center justify-center gap-2"
         >
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          <span>Tambah</span>
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          <span id="authSubmitText">Masuk</span>
         </button>
       </form>
-
-      <!-- Task List Container -->
-      <div id="taskListContainer" class="space-y-2 pt-1">
-        <!-- Rendered by JS -->
-      </div>
-
-      <!-- Empty Task State -->
-      <div id="emptyTaskState" class="py-6 text-center text-slate-500 text-xs">
-        <i data-lucide="clipboard" class="w-7 h-7 mx-auto mb-1.5 text-slate-600"></i>
-        Belum ada task yang dicatat hari ini. Yuk tambahkan di atas!
-      </div>
-
-      <!-- Optional General Note -->
-      <div class="pt-2 border-t border-slate-800/80">
-        <label for="todayNotesInput" class="block text-[11px] font-medium text-slate-400 mb-1">
-          Catatan / Catatan Ringkas Hari Ini (Opsional):
-        </label>
-        <input 
-          type="text" 
-          id="todayNotesInput" 
-          placeholder="Contoh: Meeting evaluasi bulanan jam 2 siang" 
-          class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        />
-      </div>
     </div>
 
-    <!-- 4. Ringkasan Statistik Bulan Ini -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-      <div class="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3.5">
-        <div class="text-[11px] text-slate-400 font-medium">Hari Kerja (Bulan Ini)</div>
-        <div id="statTotalDays" class="text-lg font-extrabold text-white mt-0.5">0 Hari</div>
-      </div>
-      <div class="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3.5">
-        <div class="text-[11px] text-slate-400 font-medium">Total Jam Kerja</div>
-        <div id="statTotalHours" class="text-lg font-extrabold text-emerald-400 mt-0.5">0.0 Jam</div>
-      </div>
-      <div class="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3.5">
-        <div class="text-[11px] text-slate-400 font-medium">Rata-rata Harian</div>
-        <div id="statAvgHours" class="text-lg font-extrabold text-sky-400 mt-0.5">0.0 Jam</div>
-      </div>
-      <div class="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3.5">
-        <div class="text-[11px] text-slate-400 font-medium">Izin / Cuti / Sakit</div>
-        <div id="statLeaveDays" class="text-lg font-extrabold text-amber-400 mt-0.5">0 Hari</div>
-      </div>
+    <div class="text-center text-xs text-[#64748B]">
+      HadirKu &copy; 2026 &bull; Absensi Mudah, Kerja Lebih Bermakna
     </div>
+  </div>
 
-    <!-- 5. Riwayat Absensi & Task Sebelumnya -->
-    <div class="bg-slate-900/80 rounded-3xl border border-slate-800/90 overflow-hidden shadow-xl">
-      <div class="p-4 border-b border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-            <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i>
-            Riwayat Absensi & Task
-          </h3>
-          <p class="text-[11px] text-slate-400">Daftar kehadiran dan task yang dikerjakan</p>
+  <!-- ========================================== -->
+  <!-- 3. MAIN DASHBOARD / 4 TAB NAVIGATION       -->
+  <!-- ========================================== -->
+  <div id="appSection" class="hidden flex-1 max-w-md w-full mx-auto px-4 sm:px-5 py-4 space-y-4">
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: BERANDA (Ramping, Tanpa Tombol Dobel & Istirahat) -->
+    <!-- ======================================================== -->
+    <div id="tabContentHome" class="space-y-4 animate-pop-in">
+      
+      <!-- 01. HEADER & SAMBUTAN -->
+      <div class="p-4 rounded-3xl bg-gradient-to-r from-[#0F766E] to-[#14BBA6] text-white shadow-lg shadow-[#0F766E]/20 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div id="userAvatarContainer" class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur border border-white/30 flex items-center justify-center text-white font-extrabold text-lg shadow-sm">
+            J
+          </div>
+          <div>
+            <h2 id="greetingNameDisplay" class="text-base font-extrabold leading-tight">Good Morning, John!</h2>
+            <p class="text-xs text-teal-100 font-medium">Semangat untuk hari yang produktif!</p>
+          </div>
         </div>
 
+        <button id="notificationBtn" type="button" class="w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 text-white flex items-center justify-center relative transition">
+          <i data-lucide="bell" class="w-4 h-4"></i>
+          <span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-amber-300"></span>
+        </button>
+      </div>
+
+      <!-- 02. TODAY'S STATUS & LINGKARAN JAM KERJA (Target 7 Jam: 07.30 - 14.30 WITA) -->
+      <div class="hadirku-card p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold text-[#142D4E] block">Hari Ini</span>
+            <span id="todayFullDateText" class="text-[11px] text-[#64748B] font-medium">Jumat, 16 Oktober 2026</span>
+          </div>
+          <span id="todayStatusBadge" class="text-xs px-3 py-1 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            Belum Absen
+          </span>
+        </div>
+
+        <!-- Center: Circular Progress Ring & Check In/Out Times -->
+        <div class="flex items-center justify-between px-2 pt-1">
+          <!-- Check In Column -->
+          <div class="text-center w-20">
+            <span class="text-[11px] text-[#64748B] block font-medium">Check In</span>
+            <span id="todayCheckInText" class="text-xs font-extrabold text-[#142D4E] font-mono mt-0.5 block">07:30 AM</span>
+          </div>
+
+          <!-- Circular Progress Ring (Center: Target 7 Jam) -->
+          <div class="relative flex items-center justify-center">
+            <svg class="w-32 h-32" viewBox="0 0 120 120">
+              <!-- Background Ring -->
+              <circle
+                class="text-slate-100"
+                stroke-width="8"
+                stroke="currentColor"
+                fill="transparent"
+                r="50"
+                cx="60"
+                cy="60"
+              />
+              <!-- Active Progress Arc -->
+              <circle
+                id="circularProgressArc"
+                class="progress-ring__circle text-[#14BBA6]"
+                stroke-width="8"
+                stroke-dasharray="314.159"
+                stroke-dashoffset="314.159"
+                stroke-linecap="round"
+                stroke="currentColor"
+                fill="transparent"
+                r="50"
+                cx="60"
+                cy="60"
+              />
+            </svg>
+
+            <!-- Inside Circle Content -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span class="text-[10px] text-[#64748B] font-semibold">Jam Kerja</span>
+              <span id="circularWorkedTime" class="text-lg font-extrabold text-[#142D4E] font-mono leading-none my-0.5">00:00</span>
+              <span class="text-[9px] text-[#64748B] font-medium">/ 7 jam</span>
+            </div>
+          </div>
+
+          <!-- Check Out Column -->
+          <div class="text-center w-20">
+            <span class="text-[11px] text-[#64748B] block font-medium">Check Out</span>
+            <span id="todayCheckOutText" class="text-xs font-extrabold text-[#142D4E] font-mono mt-0.5 block">--:--</span>
+          </div>
+        </div>
+
+        <!-- 2 Sub-metrics Underneath: Punch In & Total Hours (Istirahat Dihapus) -->
+        <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-center">
+          <div class="p-2.5 rounded-xl bg-slate-50">
+            <div class="text-[#168C85] flex items-center justify-center gap-1 mb-0.5">
+              <i data-lucide="clock" class="w-3 h-3"></i>
+              <span class="text-[10px] font-bold uppercase text-[#64748B]">Jam Masuk</span>
+            </div>
+            <span id="subPunchInText" class="text-xs font-extrabold text-[#142D4E] font-mono">07:30 AM</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-50">
+            <div class="text-[#14BBA6] flex items-center justify-center gap-1 mb-0.5">
+              <i data-lucide="check-circle" class="w-3 h-3"></i>
+              <span class="text-[10px] font-bold uppercase text-[#64748B]">Total Jam Kerja</span>
+            </div>
+            <span id="subTotalHoursText" class="text-xs font-extrabold text-[#142D4E] font-mono">00:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 04. KALENDER MINGGUAN (Senin s/d Minggu) -->
+      <div class="hadirku-card p-4 space-y-2.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-[#142D4E]">Kalender Mingguan</span>
+          <span id="weekRangeLabel" class="text-[11px] text-[#64748B] font-medium">12 - 18 Oktober 2026</span>
+        </div>
+
+        <!-- 7 Days Grid -->
+        <div id="weeklyCalendarGrid" class="grid grid-cols-7 gap-1 text-center pt-1">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- 05. TARGET TASK HARI INI -->
+      <div class="hadirku-card p-5 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-[#142D4E]">Target Task Hari Ini</h3>
+            <span id="homeTaskProgressCount" class="text-xs text-[#64748B]">0 dari 0 tugas selesai</span>
+          </div>
+          <button id="homeViewAllTasksLink" type="button" class="text-xs font-bold text-[#168C85] hover:underline flex items-center gap-0.5">
+            <span>Lihat Semua</span>
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- Progress Bar (Teal) -->
+        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div id="homeTaskProgressBar" class="bg-[#14BBA6] h-full w-0 transition-all duration-300"></div>
+        </div>
+
+        <!-- 3 Tasks Preview -->
+        <div id="homeTaskListPreview" class="space-y-2 pt-1">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- 06. RINGKASAN KEHADIRAN BULANAN (Dihitung dari data riwayat) -->
+      <div class="hadirku-card p-5 space-y-3">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-[#142D4E]">Ringkasan Bulan Berjalan</span>
+          <span id="homeMonthLabel" class="text-[11px] text-[#64748B] font-medium">Oktober 2026</span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-2 text-center">
+          <div class="p-2.5 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+            <span class="text-[10px] text-[#64748B] font-semibold block">Hadir</span>
+            <span id="summaryHadirCount" class="text-base font-extrabold text-[#16A34A] block mt-0.5">0</span>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-amber-50/60 border border-amber-100">
+            <span class="text-[10px] text-[#64748B] font-semibold block">Terlambat</span>
+            <span id="summaryTerlambatCount" class="text-base font-extrabold text-[#F59E0B] block mt-0.5">0</span>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-sky-50/60 border border-sky-100">
+            <span class="text-[10px] text-[#64748B] font-semibold block">Izin</span>
+            <span id="summaryIzinCount" class="text-base font-extrabold text-[#0284C7] block mt-0.5">0</span>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-teal-50/60 border border-teal-100">
+            <span class="text-[10px] text-[#64748B] font-semibold block">Total Jam</span>
+            <span id="summaryTotalHoursCount" class="text-xs font-extrabold text-[#168C85] block mt-1 font-mono">00:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 07. AKTIVITAS TERBARU (TIMELINE ABSENSI HARI INI) -->
+      <div class="hadirku-card p-5 space-y-3">
+        <h3 class="text-sm font-bold text-[#142D4E]">Aktivitas Hari Ini</h3>
+
+        <div class="relative pl-6 space-y-4 pt-1">
+          <!-- Timeline Line -->
+          <div class="timeline-line"></div>
+
+          <!-- Item 1: Absen Masuk -->
+          <div class="relative flex items-start justify-between text-xs">
+            <div id="timelineDotMasuk" class="timeline-dot -left-6 absolute top-1 bg-slate-300"></div>
+            <div>
+              <span class="font-bold text-[#142D4E] block">Absen Masuk</span>
+              <span class="text-[11px] text-[#64748B]">Kehadiran kerja tercatat</span>
+            </div>
+            <span id="timelineTimeMasuk" class="font-mono font-bold text-[#142D4E]">--:--</span>
+          </div>
+
+          <!-- Item 2: Absen Pulang -->
+          <div class="relative flex items-start justify-between text-xs pt-1">
+            <div id="timelineDotPulang" class="timeline-dot -left-6 absolute top-1 bg-slate-300"></div>
+            <div>
+              <span class="font-bold text-[#142D4E] block">Absen Pulang</span>
+              <span class="text-[11px] text-[#64748B]">Selesai jam kerja hari ini</span>
+            </div>
+            <span id="timelineTimePulang" class="font-mono font-bold text-[#142D4E]">--:--</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: RIWAYAT KEHADIRAN (Dengan Cetak PDF Resmi)        -->
+    <!-- ======================================================== -->
+    <div id="tabContentHistory" class="hidden space-y-4 animate-pop-in">
+      <div class="flex items-center justify-between pt-1">
+        <h2 class="text-xl font-extrabold text-[#142D4E]">Riwayat Kehadiran</h2>
         <div class="flex items-center gap-2">
-          <button id="quickManualBtn" type="button" class="text-xs px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium border border-slate-700 flex items-center gap-1">
-            <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-indigo-400"></i>
-            <span>Input Tanggal Lain</span>
+          <!-- Button Cetak Laporan PDF Resmi -->
+          <button id="openExportPdfModalBtn" type="button" class="text-xs font-bold text-white bg-[#142D4E] hover:bg-[#0F172A] px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span>Cetak PDF</span>
           </button>
-          <button id="exportCsvBtn" type="button" class="text-xs px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium border border-slate-700 flex items-center gap-1" title="Unduh CSV">
+          <button id="exportCsvBtn" type="button" class="text-xs font-bold text-[#168C85] bg-[#E6F7F6] border border-[#168C85]/20 px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-sm">
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
-            <span>Export</span>
+            <span>CSV</span>
           </button>
         </div>
       </div>
 
-      <!-- History List (Cards layout optimized for mobile) -->
-      <div id="historyListContainer" class="divide-y divide-slate-800/70">
-        <!-- Rendered by JS -->
+      <!-- Month & Year Selector Card -->
+      <div class="hadirku-card p-3 flex items-center justify-between">
+        <button id="prevMonthBtn" type="button" class="p-2 rounded-xl hover:bg-slate-100 text-[#64748B] transition">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </button>
+        <span id="currentPeriodLabel" class="text-sm font-extrabold text-[#142D4E]">Oktober 2026</span>
+        <button id="nextMonthBtn" type="button" class="p-2 rounded-xl hover:bg-slate-100 text-[#64748B] transition">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Summary Badges in History -->
+      <div class="grid grid-cols-4 gap-2 text-center text-xs">
+        <div class="hadirku-card p-2.5">
+          <span class="text-[10px] text-[#64748B] block font-semibold">Hadir</span>
+          <span id="histHadirCount" class="text-base font-extrabold text-[#16A34A] block mt-0.5">0</span>
+        </div>
+        <div class="hadirku-card p-2.5">
+          <span class="text-[10px] text-[#64748B] block font-semibold">Terlambat</span>
+          <span id="histTerlambatCount" class="text-base font-extrabold text-[#F59E0B] block mt-0.5">0</span>
+        </div>
+        <div class="hadirku-card p-2.5">
+          <span class="text-[10px] text-[#64748B] block font-semibold">Izin</span>
+          <span id="histIzinCount" class="text-base font-extrabold text-[#0284C7] block mt-0.5">0</span>
+        </div>
+        <div class="hadirku-card p-2.5">
+          <span class="text-[10px] text-[#64748B] block font-semibold">Alpa</span>
+          <span id="histAlpaCount" class="text-base font-extrabold text-[#DC2626] block mt-0.5">0</span>
+        </div>
+      </div>
+
+      <!-- History List Items -->
+      <div id="historyListContainer" class="space-y-2.5">
+        <!-- Rendered dynamically by app.js -->
       </div>
 
       <!-- Empty History State -->
-      <div id="emptyHistoryState" class="hidden py-10 text-center text-slate-500 text-xs">
-        <i data-lucide="calendar" class="w-7 h-7 mx-auto mb-1 text-slate-600"></i>
-        Belum ada riwayat absensi.
+      <div id="emptyHistoryState" class="hidden hadirku-card py-12 text-center text-[#64748B] space-y-2">
+        <i data-lucide="calendar" class="w-10 h-10 mx-auto text-slate-300"></i>
+        <p class="text-sm font-semibold">Belum ada riwayat absensi bulan ini.</p>
       </div>
     </div>
 
-  </main>
+    <!-- ======================================================== -->
+    <!-- TAB 3: TUGAS / TARGET TASK                               -->
+    <!-- ======================================================== -->
+    <div id="tabContentTasks" class="hidden space-y-4 animate-pop-in">
+      <div class="flex items-center justify-between pt-1">
+        <div>
+          <h2 class="text-xl font-extrabold text-[#142D4E]">Target Task</h2>
+          <p id="tasksSubtitleProgress" class="text-xs text-[#64748B]">0 dari 0 tugas selesai</p>
+        </div>
+        <button id="openAddTaskModalBtn" type="button" class="w-10 h-10 rounded-2xl bg-[#168C85] text-white flex items-center justify-center shadow-md shadow-[#168C85]/20 active:scale-95 transition" title="Tambah Tugas">
+          <i data-lucide="plus" class="w-5 h-5"></i>
+        </button>
+      </div>
 
-  <!-- Footer / Bottom Links -->
-  <footer class="border-t border-slate-800/80 py-4 text-center text-[11px] text-slate-500">
-    <div class="max-w-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-      <p>AbsensiKu &copy; 2026 &bull; Tersimpan otomatis di browser HP / Laptop</p>
-      <div class="flex items-center gap-3">
-        <button id="backupDataBtn" class="hover:text-indigo-400 transition">Backup (JSON)</button>
-        <span>&bull;</span>
-        <label for="restoreDataInput" class="hover:text-indigo-400 cursor-pointer transition">Restore</label>
-        <input type="file" id="restoreDataInput" accept=".json" class="hidden" />
+      <!-- Big Progress Card -->
+      <div class="hadirku-card p-4 space-y-2.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-semibold text-[#142D4E]">Progres Tugas Hari Ini</span>
+          <span id="tasksPercentBadge" class="font-extrabold text-[#168C85]">0%</span>
+        </div>
+        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+          <div id="tasksProgressBar" class="bg-[#14BBA6] h-full w-0 transition-all duration-300"></div>
+        </div>
+      </div>
+
+      <!-- Filter Buttons -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-semibold">
+        <button type="button" data-filter="all" class="task-filter-btn px-3.5 py-1.5 rounded-xl bg-[#142D4E] text-white shadow-sm transition">Semua</button>
+        <button type="button" data-filter="uncompleted" class="task-filter-btn px-3.5 py-1.5 rounded-xl bg-white text-[#64748B] border border-[#E2E8F0] hover:text-[#142D4E] transition">Belum</button>
+        <button type="button" data-filter="completed" class="task-filter-btn px-3.5 py-1.5 rounded-xl bg-white text-[#64748B] border border-[#E2E8F0] hover:text-[#142D4E] transition">Selesai</button>
+      </div>
+
+      <!-- Tasks List Container -->
+      <div id="fullTaskListContainer" class="space-y-2.5">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Empty Tasks State -->
+      <div id="emptyTasksFullState" class="hidden hadirku-card py-12 text-center text-[#64748B] space-y-2">
+        <i data-lucide="clipboard-check" class="w-10 h-10 mx-auto text-slate-300"></i>
+        <p class="text-sm font-semibold">Belum ada tugas untuk filter ini.</p>
+        <p class="text-xs text-slate-400">Klik tombol + di pojok kanan atas untuk menambah tugas baru.</p>
       </div>
     </div>
-  </footer>
 
-  <!-- Modal: Manual Entry / Edit Absensi -->
-  <div id="entryModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 id="modalTitle" class="text-sm font-bold text-white flex items-center gap-2">
-          <i data-lucide="edit-3" class="w-4 h-4 text-indigo-400"></i>
-          Edit Catatan Absensi
+    <!-- ======================================================== -->
+    <!-- TAB 4: PROFIL PENGGUNA (Dengan Pembuat Aplikasi & WITA)  -->
+    <!-- ======================================================== -->
+    <div id="tabContentProfile" class="hidden space-y-4 animate-pop-in">
+      <div class="pt-1">
+        <h2 class="text-xl font-extrabold text-[#142D4E]">Profil</h2>
+      </div>
+
+      <!-- Profile Header Card -->
+      <div class="hadirku-card p-5 flex items-center gap-4">
+        <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#168C85] to-[#14BBA6] text-white flex items-center justify-center font-extrabold text-2xl shadow-lg shadow-[#168C85]/20 flex-shrink-0">
+          <span id="profileAvatarInitial">J</span>
+        </div>
+        <div class="overflow-hidden">
+          <h3 id="profileNameDisplay" class="text-base font-extrabold text-[#142D4E] truncate">John Doe</h3>
+          <p id="profileEmailDisplay" class="text-xs text-[#64748B] truncate">Penata Layanan Operasional</p>
+          <span class="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E6F7F6] text-[#168C85]">
+            Akun Aktif
+          </span>
+        </div>
+      </div>
+
+      <!-- Settings Menu List (Sesuai Revisi Lu) -->
+      <div class="hadirku-card divide-y divide-slate-100 overflow-hidden text-xs">
+        
+        <!-- Baris 1: Jam Kerja 07:30 - 14:30 WITA -->
+        <div class="p-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-slate-100 text-[#142D4E] flex items-center justify-center">
+              <i data-lucide="clock" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="font-bold text-[#142D4E] block">Jam Kerja Standar</span>
+              <span class="text-[#64748B] text-[11px]">07:30 - 14:30 (WITA)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Baris 2: Pembuat Aplikasi Syamsu Rifani, S.Kom., M.M. -->
+        <div class="p-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-[#16A34A] flex items-center justify-center">
+              <i data-lucide="code" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="font-bold text-[#142D4E] block">Pembuat Aplikasi</span>
+              <span class="text-[#168C85] font-semibold text-[11px]">Syamsu Rifani, S.Kom., M.M.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Baris 3: Database Supabase Cloud -->
+        <button id="openConfigBtnProfile" type="button" class="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition text-left">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-[#E6F7F6] text-[#168C85] flex items-center justify-center">
+              <i data-lucide="database" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="font-bold text-[#142D4E] block">Database Supabase Cloud</span>
+              <span class="text-[#64748B] text-[11px]">Koneksi Project URL & Key</span>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+        </button>
+
+        <!-- Baris 4: Tema Tampilan -->
+        <button id="themeToggleBtnProfile" type="button" class="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition text-left">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-slate-100 text-[#142D4E] flex items-center justify-center">
+              <i id="profileThemeIcon" data-lucide="moon" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="font-bold text-[#142D4E] block">Tema Aplikasi</span>
+              <span id="profileThemeText" class="text-[#64748B] text-[11px]">Mode Terang (Light)</span>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+        </button>
+
+        <!-- Baris 5: Keluar Akun -->
+        <button id="logoutBtnProfile" type="button" class="w-full p-4 flex items-center justify-between hover:bg-rose-50 transition text-left text-[#DC4545]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-rose-100 text-[#DC4545] flex items-center justify-center">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </div>
+            <span class="font-bold">Keluar Akun</span>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-rose-300"></i>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 08. BOTTOM NAVIGATION (5 Menu dengan Center Floating FAB)-->
+  <!-- ======================================================== -->
+  <nav id="bottomNav" class="bottom-nav fixed bottom-0 left-0 right-0 z-40">
+    <div class="max-w-md mx-auto px-3 py-2 flex items-center justify-between">
+      
+      <!-- 01. Beranda -->
+      <button type="button" data-tab="home" class="bottom-nav-item active flex flex-col items-center gap-1 py-1 px-2.5 rounded-2xl flex-1">
+        <div class="nav-icon-wrapper p-1 rounded-xl transition">
+          <i data-lucide="home" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[10px] font-bold">Beranda</span>
+      </button>
+
+      <!-- 02. Riwayat -->
+      <button type="button" data-tab="history" class="bottom-nav-item flex flex-col items-center gap-1 py-1 px-2.5 rounded-2xl flex-1">
+        <div class="nav-icon-wrapper p-1 rounded-xl transition">
+          <i data-lucide="history" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[10px] font-bold">Riwayat</span>
+      </button>
+
+      <!-- 03. Tombol Absen Utama (Floating Fingerprint Button in Center) -->
+      <div class="flex flex-col items-center justify-center -mt-6 flex-shrink-0 px-1">
+        <button 
+          id="centerFabAbsenBtn" 
+          type="button" 
+          class="nav-fab shadow-xl active:scale-95" 
+          title="Tombol Absen Cepat"
+        >
+          <i data-lucide="fingerprint" class="w-7 h-7"></i>
+        </button>
+        <span class="text-[10px] font-bold text-[#168C85] mt-1">Absen</span>
+      </div>
+
+      <!-- 04. Tugas -->
+      <button type="button" data-tab="tasks" class="bottom-nav-item flex flex-col items-center gap-1 py-1 px-2.5 rounded-2xl flex-1">
+        <div class="nav-icon-wrapper p-1 rounded-xl transition">
+          <i data-lucide="check-square" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[10px] font-bold">Tugas</span>
+      </button>
+
+      <!-- 05. Profil -->
+      <button type="button" data-tab="profile" class="bottom-nav-item flex flex-col items-center gap-1 py-1 px-2.5 rounded-2xl flex-1">
+        <div class="nav-icon-wrapper p-1 rounded-xl transition">
+          <i data-lucide="user" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[10px] font-bold">Profil</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: KONFIRMASI ABSEN PULANG                           -->
+  <!-- ======================================================== -->
+  <div id="confirmPulangModal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="hadirku-card max-w-sm w-full p-6 text-center space-y-4 animate-pop-in shadow-2xl">
+      <div class="w-16 h-16 mx-auto rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shadow-md">
+        <i data-lucide="help-circle" class="w-8 h-8"></i>
+      </div>
+      <div>
+        <h3 class="text-lg font-extrabold text-[#142D4E]">Konfirmasi Absen Pulang</h3>
+        <p class="text-xs text-[#64748B] mt-1">
+          Apakah Anda yakin ingin menyelesaikan jam kerja dan melakukan absen pulang hari ini?
+        </p>
+      </div>
+      <div class="p-3 rounded-xl bg-slate-50 text-xs text-[#142D4E] font-medium">
+        Waktu Sekarang: <span id="confirmPulangCurrentTime" class="font-bold font-mono text-[#168C85]">14:30 WITA</span>
+      </div>
+      <div class="grid grid-cols-2 gap-2.5 pt-2">
+        <button id="cancelConfirmPulangBtn" type="button" class="h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#64748B] text-xs font-bold transition">
+          Batal
+        </button>
+        <button id="proceedConfirmPulangBtn" type="button" class="h-11 rounded-xl bg-[#142D4E] hover:bg-[#0F172A] text-white text-xs font-bold shadow-md transition">
+          Ya, Pulang
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: KONFIRMASI SUKSES ABSEN (Masuk / Pulang)          -->
+  <!-- ======================================================== -->
+  <div id="absenSuccessModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="hadirku-card max-w-sm w-full p-6 text-center space-y-5 animate-pop-in shadow-2xl">
+      <div id="modalSuccessBadge" class="w-20 h-20 mx-auto rounded-full bg-[#16A34A] text-white flex items-center justify-center shadow-xl shadow-[#16A34A]/30">
+        <i data-lucide="check" class="w-10 h-10 stroke-[3]"></i>
+      </div>
+
+      <div class="space-y-1">
+        <h3 id="modalSuccessTitle" class="text-xl font-extrabold text-[#142D4E]">Absen Masuk Berhasil!</h3>
+        <div id="modalSuccessTime" class="text-4xl font-extrabold text-[#142D4E] font-mono py-1">07:30 AM</div>
+        <p id="modalSuccessDate" class="text-xs text-[#64748B] font-medium">Jumat, 16 Oktober 2026</p>
+      </div>
+
+      <div class="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-[#64748B] flex items-center justify-center gap-1.5">
+        <i data-lucide="map-pin" class="w-4 h-4 text-[#168C85]"></i>
+        <span>Kehadiran tercatat secara otomatis</span>
+      </div>
+
+      <p id="modalSuccessSubtitle" class="text-xs text-[#64748B] italic">
+        Semangat bekerja! Jangan lupa absen pulang sesuai jam kerja ya!
+      </p>
+
+      <button id="closeSuccessModalBtn" type="button" class="w-full h-12 rounded-xl font-bold text-sm text-white bg-[#142D4E] hover:bg-[#0F172A] active:scale-[0.98] transition">
+        Kembali ke Beranda
+      </button>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: FORM CETAK LAPORAN REKAP PDF RESMI                -->
+  <!-- ======================================================== -->
+  <div id="exportPdfModal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="hadirku-card max-w-md w-full p-6 space-y-4 shadow-2xl animate-pop-in my-8">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-sm font-extrabold text-[#142D4E] flex items-center gap-2">
+          <i data-lucide="file-text" class="w-4 h-4 text-[#168C85]"></i>
+          Cetak Rekap Laporan PDF (Ke Atasan)
         </h3>
-        <button id="closeModalBtn" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg">
+        <button id="closeExportPdfModalBtn" class="p-1 rounded-lg text-slate-400 hover:text-slate-600">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="entryForm" class="space-y-3">
-        <input type="hidden" id="formEntryId" />
-
-        <!-- Date Picker -->
-        <div>
-          <label for="formDate" class="block text-xs font-medium text-slate-300 mb-1">Tanggal:</label>
-          <input type="date" id="formDate" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-
-        <!-- Status -->
-        <div>
-          <label for="formStatus" class="block text-xs font-medium text-slate-300 mb-1">Status Kehadiran:</label>
-          <select id="formStatus" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="Hadir (WFO)">Hadir (WFO)</option>
-            <option value="WFH">WFH (Work From Home)</option>
-            <option value="Izin">Izin</option>
-            <option value="Cuti">Cuti</option>
-            <option value="Sakit">Sakit</option>
-          </select>
-        </div>
-
-        <!-- Clock In & Clock Out Inputs -->
-        <div id="formTimesRow" class="grid grid-cols-2 gap-2">
+      <form id="exportPdfForm" class="space-y-3.5 text-xs">
+        
+        <!-- Bagian 1: Data Pegawai -->
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-2.5">
+          <span class="font-extrabold text-[#142D4E] block text-[11px] uppercase tracking-wider">Identitas Pegawai</span>
           <div>
-            <label for="formClockIn" class="block text-xs font-medium text-slate-300 mb-1">Jam Masuk:</label>
-            <input type="time" id="formClockIn" step="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <label for="pdfNamaPegawai" class="block font-semibold text-[#172B4D] mb-1">Nama Pegawai:</label>
+            <input type="text" id="pdfNamaPegawai" required placeholder="Contoh: Refan Naufal" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
           </div>
-          <div>
-            <label for="formClockOut" class="block text-xs font-medium text-slate-300 mb-1">Jam Pulang:</label>
-            <input type="time" id="formClockOut" step="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="pdfNipPegawai" class="block font-semibold text-[#172B4D] mb-1">NIP Pegawai:</label>
+              <input type="text" id="pdfNipPegawai" placeholder="19950812 202012 1 001" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+            </div>
+            <div>
+              <label for="pdfJabatanPegawai" class="block font-semibold text-[#172B4D] mb-1">Jabatan:</label>
+              <input type="text" id="pdfJabatanPegawai" placeholder="Staf Operasional" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+            </div>
           </div>
         </div>
 
-        <!-- Notes -->
-        <div>
-          <label for="formNotes" class="block text-xs font-medium text-slate-300 mb-1">Catatan Singkat:</label>
-          <input type="text" id="formNotes" placeholder="Catatan singkat..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <!-- Bagian 2: Data Atasan -->
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-2.5">
+          <span class="font-extrabold text-[#142D4E] block text-[11px] uppercase tracking-wider">Data Atasan Langsung (Tanda Tangan)</span>
+          <div>
+            <label for="pdfNamaAtasan" class="block font-semibold text-[#172B4D] mb-1">Nama Atasan Langsung:</label>
+            <input type="text" id="pdfNamaAtasan" required placeholder="Contoh: Drs. H. Ahmad Fauzi, M.Si" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="pdfNipAtasan" class="block font-semibold text-[#172B4D] mb-1">NIP Atasan:</label>
+              <input type="text" id="pdfNipAtasan" placeholder="19780514 200212 1 002" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+            </div>
+            <div>
+              <label for="pdfJabatanAtasan" class="block font-semibold text-[#172B4D] mb-1">Jabatan Atasan:</label>
+              <input type="text" id="pdfJabatanAtasan" placeholder="Kepala Sub Bagian Umum" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+            </div>
+          </div>
         </div>
 
-        <div class="pt-2 border-t border-slate-800 flex items-center justify-end gap-2">
-          <button type="button" id="cancelModalBtn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300">Batal</button>
-          <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow">Simpan</button>
+        <!-- Bagian 3: Kota Penandatanganan -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="pdfKotaTtd" class="block font-semibold text-[#172B4D] mb-1">Kota / Lokasi:</label>
+            <input type="text" id="pdfKotaTtd" placeholder="Banjarmasin" class="w-full bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+          </div>
+          <div>
+            <label class="block font-semibold text-[#172B4D] mb-1">Periode Bulan:</label>
+            <input type="text" id="pdfPeriodeDisplay" readonly class="w-full bg-slate-100 border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-slate-500 font-bold" />
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" id="cancelExportPdfBtn" class="px-4 py-2.5 rounded-xl bg-slate-100 text-[#64748B] font-bold">Batal</button>
+          <button type="submit" id="btnGeneratePdfDownload" class="px-5 py-2.5 rounded-xl bg-[#142D4E] hover:bg-[#0F172A] text-white font-bold shadow-md flex items-center gap-1.5">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Unduh PDF Resmi</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- HIDDEN PRINTABLE CONTAINER FOR PDF REPORT GENERATION     -->
+  <!-- ======================================================== -->
+  <div class="hidden">
+    <div id="printableReportContainer" class="p-8 max-w-4xl mx-auto bg-white text-black text-xs leading-normal">
+      <!-- Kop Header Resmi -->
+      <div class="text-center border-b-2 border-black pb-3 mb-4">
+        <h2 class="text-base font-extrabold uppercase tracking-wide">LAPORAN REKAPITULASI KEHADIRAN KERJA PEGAWAI</h2>
+        <h3 id="printReportPeriodeTitle" class="text-xs font-bold mt-0.5">PERIODE: OKTOBER 2026</h3>
+        <p class="text-[10px] text-gray-600 mt-0.5">Dicatat otomatis melalui Sistem HadirKu</p>
+      </div>
+
+      <!-- Biodata Pegawai -->
+      <div class="grid grid-cols-2 gap-4 mb-4 text-[11px]">
+        <table>
+          <tr>
+            <td class="font-bold w-28 border-0 p-0.5">Nama Pegawai</td>
+            <td class="w-3 border-0 p-0.5">:</td>
+            <td id="printNamaPegawai" class="font-semibold border-0 p-0.5">-</td>
+          </tr>
+          <tr>
+            <td class="font-bold border-0 p-0.5">NIP</td>
+            <td class="border-0 p-0.5">:</td>
+            <td id="printNipPegawai" class="border-0 p-0.5">-</td>
+          </tr>
+          <tr>
+            <td class="font-bold border-0 p-0.5">Jabatan</td>
+            <td class="border-0 p-0.5">:</td>
+            <td id="printJabatanPegawai" class="border-0 p-0.5">-</td>
+          </tr>
+        </table>
+        <table>
+          <tr>
+            <td class="font-bold w-28 border-0 p-0.5">Jam Kerja Standar</td>
+            <td class="w-3 border-0 p-0.5">:</td>
+            <td class="border-0 p-0.5">07:30 - 14:30 WITA</td>
+          </tr>
+          <tr>
+            <td class="font-bold border-0 p-0.5">Total Hari Kerja</td>
+            <td class="border-0 p-0.5">:</td>
+            <td id="printTotalHariHadir" class="font-semibold border-0 p-0.5">0 Hari</td>
+          </tr>
+          <tr>
+            <td class="font-bold border-0 p-0.5">Total Jam Kerja</td>
+            <td class="border-0 p-0.5">:</td>
+            <td id="printTotalJamKerja" class="font-semibold border-0 p-0.5">00:00 Jam</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Tabel Kehadiran -->
+      <table class="mb-4">
+        <thead>
+          <tr>
+            <th style="width: 35px;">No</th>
+            <th>Tanggal</th>
+            <th>Hari</th>
+            <th>Jam Masuk</th>
+            <th>Jam Pulang</th>
+            <th>Durasi Kerja</th>
+            <th>Status Kehadiran</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody id="printAttendanceTableBody">
+          <!-- Rendered dynamically -->
+        </tbody>
+      </table>
+
+      <!-- 2 Kolom Tanda Tangan Resmi -->
+      <div class="grid grid-cols-2 gap-8 pt-6 text-[11px] text-center break-inside-avoid">
+        <div>
+          <p>Mengetahui,</p>
+          <p id="printJabatanAtasan" class="font-bold">Atasan Langsung</p>
+          <div class="h-20"></div>
+          <p id="printNamaAtasan" class="font-bold underline text-xs">Drs. H. Ahmad Fauzi, M.Si</p>
+          <p id="printNipAtasan">NIP. 19780514 200212 1 002</p>
+        </div>
+        <div>
+          <p id="printKotaTanggalCetak">Banjarmasin, 31 Oktober 2026</p>
+          <p class="font-bold">Pegawai yang bersangkutan,</p>
+          <div class="h-20"></div>
+          <p id="printNamaPegawaiBawah" class="font-bold underline text-xs">Refan Naufal</p>
+          <p id="printNipPegawaiBawah">NIP. 19950812 202012 1 001</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: DETAIL KALENDER HARIAN                            -->
+  <!-- ======================================================== -->
+  <div id="calendarDetailModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="hadirku-card max-w-xs w-full p-5 space-y-3 shadow-2xl animate-pop-in">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h4 id="calDetailDateTitle" class="text-xs font-extrabold text-[#142D4E]">Jumat, 16 Oktober 2026</h4>
+        <button id="closeCalDetailModalBtn" class="p-1 text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div id="calDetailBody" class="space-y-2 text-xs"></div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: TAMBAH TUGAS (Add Task)                          -->
+  <!-- ======================================================== -->
+  <div id="addTaskModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="hadirku-card max-w-sm w-full p-5 space-y-4 shadow-2xl animate-pop-in">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-sm font-extrabold text-[#142D4E] flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-[#168C85]"></i>
+          Tambah Target Tugas Baru
+        </h3>
+        <button id="closeAddTaskModalBtn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="addTaskModalForm" class="space-y-3">
+        <div>
+          <label for="modalTaskTitle" class="block text-xs font-semibold text-[#172B4D] mb-1">Judul Tugas:</label>
+          <input type="text" id="modalTaskTitle" required placeholder="Contoh: Selesaikan laporan harian" class="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-xs text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#168C85]" />
+        </div>
+
+        <div>
+          <label for="modalTaskDesc" class="block text-xs font-semibold text-[#172B4D] mb-1">Deskripsi Singkat (Opsional):</label>
+          <textarea id="modalTaskDesc" rows="2" placeholder="Catatan pengerjaan..." class="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl px-3.5 py-2 text-xs text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#168C85]"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label for="modalTaskDueDate" class="block text-xs font-semibold text-[#172B4D] mb-1">Tanggal Tenggat:</label>
+            <input type="date" id="modalTaskDueDate" class="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#168C85]" />
+          </div>
+
+          <div>
+            <label for="modalTaskPriority" class="block text-xs font-semibold text-[#172B4D] mb-1">Prioritas:</label>
+            <select id="modalTaskPriority" class="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#168C85]">
+              <option value="Sedang">🟡 Sedang</option>
+              <option value="Tinggi">🔴 Tinggi</option>
+              <option value="Rendah">🔵 Rendah</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" id="cancelAddTaskModalBtn" class="px-4 py-2.5 rounded-xl bg-slate-100 text-[#64748B] hover:bg-slate-200 text-xs font-bold">Batal</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#168C85] hover:bg-[#0D9488] text-white text-xs font-bold shadow-md shadow-[#168C85]/20">Simpan Tugas</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: SUPABASE CONFIGURATION                           -->
+  <!-- ======================================================== -->
+  <div id="configModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="hadirku-card max-w-sm w-full p-5 space-y-4 shadow-2xl animate-pop-in">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-sm font-extrabold text-[#142D4E] flex items-center gap-2">
+          <i data-lucide="database" class="w-4 h-4 text-[#168C85]"></i>
+          Pengaturan Supabase Cloud
+        </h3>
+        <button id="closeConfigModalBtn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="configForm" class="space-y-3">
+        <div>
+          <label for="cfgSupabaseUrl" class="block text-xs font-semibold text-[#172B4D] mb-1">Project URL:</label>
+          <input type="url" id="cfgSupabaseUrl" placeholder="https://xyz.supabase.co" required class="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none" />
+        </div>
+
+        <div>
+          <label for="cfgSupabaseKey" class="block text-xs font-semibold text-[#172B4D] mb-1">Project Anon Key:</label>
+          <textarea id="cfgSupabaseKey" rows="3" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." required class="w-full bg-slate-50 border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#172B4D] focus:ring-2 focus:ring-[#168C85] outline-none font-mono"></textarea>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" id="cancelConfigModalBtn" class="px-3.5 py-2 rounded-xl bg-slate-100 text-[#64748B] text-xs font-bold">Batal</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-[#168C85] text-white text-xs font-bold shadow">Simpan</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 max-w-sm w-[90%] pointer-events-none"></div>
+  <div id="toastContainer" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 max-w-xs w-[90%] pointer-events-none"></div>
 
-  <!-- App Script -->
+  <!-- Main JavaScript -->
   <script src="app.js"></script>
 </body>
 </html>

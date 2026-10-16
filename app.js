@@ -1,88 +1,199 @@
 /**
- * AbsensiKu - Aplikasi Pencatat Kehadiran & Daily Tasks Pribadi
- * Pure JavaScript with LocalStorage & PWA Support
+ * HadirKu - Absensi Mudah, Kerja Lebih Bermakna
+ * Full Implementation with PDF Official Report, Confirmation Modal, 7-Hour Target & Custom Splash
  */
 
 (() => {
   'use strict';
 
   // --- Constants & Storage Keys ---
-  const STORAGE_KEY = 'absensiku_records_v2';
-  const THEME_KEY = 'absensiku_theme';
+  const THEME_KEY = 'hadirku_theme';
+  const CFG_URL_KEY = 'absensiku_supabase_url';
+  const CFG_KEY_KEY = 'absensiku_supabase_key';
+  const PDF_INFO_KEY = 'hadirku_pdf_officials';
+  const CIRCLE_CIRCUMFERENCE = 314.159; // 2 * PI * 50
+  const TARGET_WORK_MINUTES = 420; // 7 jam kerja: 07.30 - 14.30 WITA
 
   // --- State ---
-  let records = [];
-  let selectedStatus = 'Hadir (WFO)';
+  let supabase = null;
+  let currentUser = null;
+  let records = [];       // Attendance records from Supabase
+  let allTasks = [];      // Tasks from Supabase
   let timerInterval = null;
-  let deferredPrompt = null;
+  let activeTab = 'home';
+  let taskFilter = 'all';
+  let currentHistoryPeriod = new Date(); // for history month view
 
   // --- DOM Elements ---
-  const liveClockEl = document.getElementById('liveClock');
-  const fullDateDisplayEl = document.getElementById('fullDateDisplay');
-  const greetingTextEl = document.getElementById('greetingText');
-  const headerDateTextEl = document.getElementById('headerDateText');
-  const todayStatusPillEl = document.getElementById('todayStatusPill');
+  const splashScreen = document.getElementById('splashScreen');
+  const authSection = document.getElementById('authSection');
+  const appSection = document.getElementById('appSection');
+  const bottomNav = document.getElementById('bottomNav');
 
-  const todayClockInTextEl = document.getElementById('todayClockInText');
-  const todayClockOutTextEl = document.getElementById('todayClockOutText');
-  const workingTimerContainerEl = document.getElementById('workingTimerContainer');
-  const activeDurationTimerEl = document.getElementById('activeDurationTimer');
+  // Auth Elements
+  const tabLoginBtn = document.getElementById('tabLoginBtn');
+  const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+  const authForm = document.getElementById('authForm');
+  const authEmail = document.getElementById('authEmail');
+  const authPassword = document.getElementById('authPassword');
+  const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const authSubmitText = document.getElementById('authSubmitText');
+  const openConfigBtnAuth = document.getElementById('openConfigBtnAuth');
+  let isRegisterMode = false;
 
-  const statusButtonGroup = document.getElementById('statusButtonGroup');
-  const workingActionButtons = document.getElementById('workingActionButtons');
-  const clockInBtn = document.getElementById('clockInBtn');
-  const clockOutBtn = document.getElementById('clockOutBtn');
-  const leaveActionButton = document.getElementById('leaveActionButton');
-  const logLeaveBtn = document.getElementById('logLeaveBtn');
-  const logLeaveBtnText = document.getElementById('logLeaveBtnText');
-  const todayCompletedActions = document.getElementById('todayCompletedActions');
-  const editTodayEntryBtn = document.getElementById('editTodayEntryBtn');
-  const quickManualBtn = document.getElementById('quickManualBtn');
-  const todayNotesInput = document.getElementById('todayNotesInput');
+  // Header Elements (Home)
+  const userAvatarContainer = document.getElementById('userAvatarContainer');
+  const greetingNameDisplay = document.getElementById('greetingNameDisplay');
+  const notificationBtn = document.getElementById('notificationBtn');
 
-  // Task Elements
-  const addTaskForm = document.getElementById('addTaskForm');
-  const newTaskInput = document.getElementById('newTaskInput');
-  const taskListContainer = document.getElementById('taskListContainer');
-  const emptyTaskState = document.getElementById('emptyTaskState');
-  const taskProgressBadge = document.getElementById('taskProgressBadge');
-  const taskProgressBar = document.getElementById('taskProgressBar');
+  // Today Circular Ring & Status Card
+  const todayFullDateText = document.getElementById('todayFullDateText');
+  const todayStatusBadge = document.getElementById('todayStatusBadge');
+  const circularProgressArc = document.getElementById('circularProgressArc');
+  const circularWorkedTime = document.getElementById('circularWorkedTime');
+  const todayCheckInText = document.getElementById('todayCheckInText');
+  const todayCheckOutText = document.getElementById('todayCheckOutText');
+  const subPunchInText = document.getElementById('subPunchInText');
+  const subTotalHoursText = document.getElementById('subTotalHoursText');
 
-  // Stats Elements
-  const statTotalDaysEl = document.getElementById('statTotalDays');
-  const statTotalHoursEl = document.getElementById('statTotalHours');
-  const statAvgHoursEl = document.getElementById('statAvgHours');
-  const statLeaveDaysEl = document.getElementById('statLeaveDays');
+  // Floating Center FAB
+  const centerFabAbsenBtn = document.getElementById('centerFabAbsenBtn');
 
-  // History List
+  // Weekly Calendar
+  const weekRangeLabel = document.getElementById('weekRangeLabel');
+  const weeklyCalendarGrid = document.getElementById('weeklyCalendarGrid');
+
+  // Home Task Preview
+  const homeTaskProgressCount = document.getElementById('homeTaskProgressCount');
+  const homeTaskProgressBar = document.getElementById('homeTaskProgressBar');
+  const homeTaskListPreview = document.getElementById('homeTaskListPreview');
+  const homeViewAllTasksLink = document.getElementById('homeViewAllTasksLink');
+
+  // Home Monthly Summary
+  const homeMonthLabel = document.getElementById('homeMonthLabel');
+  const summaryHadirCount = document.getElementById('summaryHadirCount');
+  const summaryTerlambatCount = document.getElementById('summaryTerlambatCount');
+  const summaryIzinCount = document.getElementById('summaryIzinCount');
+  const summaryTotalHoursCount = document.getElementById('summaryTotalHoursCount');
+
+  // Timeline Aktivitas Hari Ini
+  const timelineDotMasuk = document.getElementById('timelineDotMasuk');
+  const timelineTimeMasuk = document.getElementById('timelineTimeMasuk');
+  const timelineDotPulang = document.getElementById('timelineDotPulang');
+  const timelineTimePulang = document.getElementById('timelineTimePulang');
+
+  // Tab Contents
+  const tabContentHome = document.getElementById('tabContentHome');
+  const tabContentHistory = document.getElementById('tabContentHistory');
+  const tabContentTasks = document.getElementById('tabContentTasks');
+  const tabContentProfile = document.getElementById('tabContentProfile');
+
+  // Tasks Tab Elements
+  const tasksSubtitleProgress = document.getElementById('tasksSubtitleProgress');
+  const tasksPercentBadge = document.getElementById('tasksPercentBadge');
+  const tasksProgressBar = document.getElementById('tasksProgressBar');
+  const fullTaskListContainer = document.getElementById('fullTaskListContainer');
+  const emptyTasksFullState = document.getElementById('emptyTasksFullState');
+  const openAddTaskModalBtn = document.getElementById('openAddTaskModalBtn');
+
+  // History Tab Elements
+  const prevMonthBtn = document.getElementById('prevMonthBtn');
+  const nextMonthBtn = document.getElementById('nextMonthBtn');
+  const currentPeriodLabel = document.getElementById('currentPeriodLabel');
+  const histHadirCount = document.getElementById('histHadirCount');
+  const histTerlambatCount = document.getElementById('histTerlambatCount');
+  const histIzinCount = document.getElementById('histIzinCount');
+  const histAlpaCount = document.getElementById('histAlpaCount');
   const historyListContainer = document.getElementById('historyListContainer');
   const emptyHistoryState = document.getElementById('emptyHistoryState');
   const exportCsvBtn = document.getElementById('exportCsvBtn');
 
-  // Modal Elements
-  const entryModal = document.getElementById('entryModal');
-  const modalTitle = document.getElementById('modalTitle');
-  const entryForm = document.getElementById('entryForm');
-  const formEntryId = document.getElementById('formEntryId');
-  const formDate = document.getElementById('formDate');
-  const formStatus = document.getElementById('formStatus');
-  const formClockIn = document.getElementById('formClockIn');
-  const formClockOut = document.getElementById('formClockOut');
-  const formTimesRow = document.getElementById('formTimesRow');
-  const formNotes = document.getElementById('formNotes');
-  const closeModalBtn = document.getElementById('closeModalBtn');
-  const cancelModalBtn = document.getElementById('cancelModalBtn');
+  // Profile Tab Elements
+  const profileAvatarInitial = document.getElementById('profileAvatarInitial');
+  const profileNameDisplay = document.getElementById('profileNameDisplay');
+  const profileEmailDisplay = document.getElementById('profileEmailDisplay');
+  const openConfigBtnProfile = document.getElementById('openConfigBtnProfile');
+  const themeToggleBtnProfile = document.getElementById('themeToggleBtnProfile');
+  const profileThemeIcon = document.getElementById('profileThemeIcon');
+  const profileThemeText = document.getElementById('profileThemeText');
+  const logoutBtnProfile = document.getElementById('logoutBtnProfile');
 
-  // Theme & Backup
-  const themeToggleBtn = document.getElementById('themeToggleBtn');
-  const themeIcon = document.getElementById('themeIcon');
-  const installPwaBtn = document.getElementById('installPwaBtn');
-  const backupDataBtn = document.getElementById('backupDataBtn');
-  const restoreDataInput = document.getElementById('restoreDataInput');
+  // Confirm Pulang Modal
+  const confirmPulangModal = document.getElementById('confirmPulangModal');
+  const confirmPulangCurrentTime = document.getElementById('confirmPulangCurrentTime');
+  const cancelConfirmPulangBtn = document.getElementById('cancelConfirmPulangBtn');
+  const proceedConfirmPulangBtn = document.getElementById('proceedConfirmPulangBtn');
+
+  // Absen Success Modal
+  const absenSuccessModal = document.getElementById('absenSuccessModal');
+  const modalSuccessBadge = document.getElementById('modalSuccessBadge');
+  const modalSuccessTitle = document.getElementById('modalSuccessTitle');
+  const modalSuccessTime = document.getElementById('modalSuccessTime');
+  const modalSuccessDate = document.getElementById('modalSuccessDate');
+  const modalSuccessSubtitle = document.getElementById('modalSuccessSubtitle');
+  const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
+
+  // Export PDF Modal & Form Elements
+  const openExportPdfModalBtn = document.getElementById('openExportPdfModalBtn');
+  const exportPdfModal = document.getElementById('exportPdfModal');
+  const exportPdfForm = document.getElementById('exportPdfForm');
+  const closeExportPdfModalBtn = document.getElementById('closeExportPdfModalBtn');
+  const cancelExportPdfBtn = document.getElementById('cancelExportPdfBtn');
+  const pdfNamaPegawai = document.getElementById('pdfNamaPegawai');
+  const pdfNipPegawai = document.getElementById('pdfNipPegawai');
+  const pdfJabatanPegawai = document.getElementById('pdfJabatanPegawai');
+  const pdfNamaAtasan = document.getElementById('pdfNamaAtasan');
+  const pdfNipAtasan = document.getElementById('pdfNipAtasan');
+  const pdfJabatanAtasan = document.getElementById('pdfJabatanAtasan');
+  const pdfKotaTtd = document.getElementById('pdfKotaTtd');
+  const pdfPeriodeDisplay = document.getElementById('pdfPeriodeDisplay');
+
+  // Printable Report Elements
+  const printableReportContainer = document.getElementById('printableReportContainer');
+  const printReportPeriodeTitle = document.getElementById('printReportPeriodeTitle');
+  const printNamaPegawai = document.getElementById('printNamaPegawai');
+  const printNipPegawai = document.getElementById('printNipPegawai');
+  const printJabatanPegawai = document.getElementById('printJabatanPegawai');
+  const printTotalHariHadir = document.getElementById('printTotalHariHadir');
+  const printTotalJamKerja = document.getElementById('printTotalJamKerja');
+  const printAttendanceTableBody = document.getElementById('printAttendanceTableBody');
+  const printJabatanAtasan = document.getElementById('printJabatanAtasan');
+  const printNamaAtasan = document.getElementById('printNamaAtasan');
+  const printNipAtasan = document.getElementById('printNipAtasan');
+  const printKotaTanggalCetak = document.getElementById('printKotaTanggalCetak');
+  const printNamaPegawaiBawah = document.getElementById('printNamaPegawaiBawah');
+  const printNipPegawaiBawah = document.getElementById('printNipPegawaiBawah');
+
+  // Calendar Detail Modal
+  const calendarDetailModal = document.getElementById('calendarDetailModal');
+  const calDetailDateTitle = document.getElementById('calDetailDateTitle');
+  const calDetailBody = document.getElementById('calDetailBody');
+  const closeCalDetailModalBtn = document.getElementById('closeCalDetailModalBtn');
+
+  // Add Task Modal
+  const addTaskModal = document.getElementById('addTaskModal');
+  const addTaskModalForm = document.getElementById('addTaskModalForm');
+  const modalTaskTitle = document.getElementById('modalTaskTitle');
+  const modalTaskDesc = document.getElementById('modalTaskDesc');
+  const modalTaskDueDate = document.getElementById('modalTaskDueDate');
+  const modalTaskPriority = document.getElementById('modalTaskPriority');
+  const closeAddTaskModalBtn = document.getElementById('closeAddTaskModalBtn');
+  const cancelAddTaskModalBtn = document.getElementById('cancelAddTaskModalBtn');
+
+  // Config Modal
+  const configModal = document.getElementById('configModal');
+  const configForm = document.getElementById('configForm');
+  const cfgSupabaseUrl = document.getElementById('cfgSupabaseUrl');
+  const cfgSupabaseKey = document.getElementById('cfgSupabaseKey');
+  const closeConfigModalBtn = document.getElementById('closeConfigModalBtn');
+  const cancelConfigModalBtn = document.getElementById('cancelConfigModalBtn');
+
+  // Toast Container
   const toastContainer = document.getElementById('toastContainer');
 
   // --- Utility Helpers ---
-  const padZero = (num) => String(num).padStart(2, '0');
+  const padZero = (n) => String(n).padStart(2, '0');
 
   const getTodayDateString = () => {
     const now = new Date();
@@ -94,11 +205,35 @@
     return `${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
   };
 
-  const formatShortDate = (dateStr) => {
+  const formatTimeAmPm = (timeStr) => {
+    if (!timeStr) return '--:--';
+    const [hStr, mStr] = timeStr.split(':');
+    let h = parseInt(hStr, 10);
+    const m = mStr || '00';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${padZero(h)}:${m} ${ampm}`;
+  };
+
+  const formatDisplayDateLong = (dateObj) => {
+    return dateObj.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  const formatDisplayDateShort = (dateStr) => {
     if (!dateStr) return '-';
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const d = new Date(year, month - 1, day);
-    return d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString('id-ID', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   const calculateDuration = (startTime, endTime) => {
@@ -117,82 +252,35 @@
     const seconds = diffSec % 60;
 
     return {
-      totalSeconds: diffSec,
       totalMinutes: Math.floor(diffSec / 60),
       hours,
       minutes,
       seconds,
-      formattedText: `${hours}j ${minutes}m`
+      formattedText: `${padZero(hours)}:${padZero(minutes)}`
     };
   };
 
-  // --- LocalStorage Operations ---
-  const loadRecords = () => {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      records = data ? JSON.parse(data) : [];
-      // Ensure tasks array exists on every record
-      records.forEach((r) => {
-        if (!Array.isArray(r.tasks)) r.tasks = [];
-      });
-      records.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
-    } catch (e) {
-      console.error('Gagal membaca data dari LocalStorage:', e);
-      records = [];
-    }
-  };
-
-  const saveRecords = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-    } catch (e) {
-      console.error('Gagal menyimpan data ke LocalStorage:', e);
-      showToast('Gagal menyimpan data ke browser!', 'error');
-    }
-  };
-
-  const getTodayRecord = () => {
-    const todayStr = getTodayDateString();
-    return records.find((r) => r.date === todayStr);
-  };
-
-  const getOrCreateTodayRecord = () => {
-    let today = getTodayRecord();
-    if (!today) {
-      today = {
-        id: `rec_${Date.now()}`,
-        date: getTodayDateString(),
-        status: selectedStatus,
-        clockIn: null,
-        clockOut: null,
-        durationMinutes: 0,
-        notes: '',
-        tasks: [],
-        createdAt: new Date().toISOString()
-      };
-      records.unshift(today);
-      saveRecords();
-    }
-    return today;
+  const escapeHtml = (text) => {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
   };
 
   // --- Toast Notification ---
   const showToast = (message, type = 'info') => {
     const toast = document.createElement('div');
-    toast.className = `toast-enter flex items-center gap-2.5 p-3 rounded-2xl border shadow-2xl text-xs text-white pointer-events-auto transition ${
+    toast.className = `toast-enter flex items-center gap-2.5 p-3.5 rounded-2xl border shadow-xl text-xs text-white pointer-events-auto transition ${
       type === 'success'
-        ? 'bg-emerald-950/95 border-emerald-600/80 text-emerald-100'
+        ? 'bg-[#142D4E] border-[#16A34A] text-white'
         : type === 'error'
-        ? 'bg-rose-950/95 border-rose-600/80 text-rose-100'
-        : type === 'warning'
-        ? 'bg-amber-950/95 border-amber-600/80 text-amber-100'
-        : 'bg-slate-800/95 border-slate-600 text-slate-100'
+        ? 'bg-[#142D4E] border-[#DC2626] text-white'
+        : 'bg-[#142D4E] border-[#168C85] text-white'
     }`;
 
     const iconName = type === 'success' ? 'check-circle' : type === 'error' ? 'alert-triangle' : 'info';
     toast.innerHTML = `
-      <i data-lucide="${iconName}" class="w-4 h-4 flex-shrink-0"></i>
-      <span class="flex-1 font-medium leading-relaxed">${message}</span>
+      <i data-lucide="${iconName}" class="w-4 h-4 text-[#14BBA6] flex-shrink-0"></i>
+      <span class="flex-1 font-semibold leading-relaxed">${message}</span>
     `;
 
     toastContainer.appendChild(toast);
@@ -205,476 +293,748 @@
     }, 3000);
   };
 
-  // --- Realtime Clock & Greeting ---
-  const updateClockAndGreeting = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const seconds = now.getSeconds();
+  // --- Supabase Credentials & Client Init ---
+  const getSupabaseCredentials = () => {
+    const storedUrl = localStorage.getItem(CFG_URL_KEY);
+    const storedKey = localStorage.getItem(CFG_KEY_KEY);
 
-    liveClockEl.textContent = `${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+    const configUrl = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) ? window.SUPABASE_CONFIG.url.trim() : '';
+    const configKey = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) ? window.SUPABASE_CONFIG.anonKey.trim() : '';
 
-    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dateStr = now.toLocaleDateString('id-ID', dateOptions);
-    fullDateDisplayEl.textContent = dateStr;
-    headerDateTextEl.textContent = dateStr;
+    return {
+      url: storedUrl || configUrl,
+      key: storedKey || configKey
+    };
+  };
 
-    let greeting = 'Selamat Datang';
-    let greetingIcon = 'sparkles';
-    if (hours >= 4 && hours < 11) {
-      greeting = 'Selamat Pagi ☀️';
-      greetingIcon = 'sun';
-    } else if (hours >= 11 && hours < 15) {
-      greeting = 'Selamat Siang 🌤️';
-      greetingIcon = 'sun-medium';
-    } else if (hours >= 15 && hours < 18) {
-      greeting = 'Selamat Sore 🌇';
-      greetingIcon = 'sunset';
-    } else {
-      greeting = 'Selamat Malam 🌙';
-      greetingIcon = 'moon';
+  const initSupabaseClient = () => {
+    const { url, key } = getSupabaseCredentials();
+
+    if (!url || !key) {
+      supabase = null;
+      return false;
     }
 
-    greetingTextEl.innerHTML = `
-      <i data-lucide="${greetingIcon}" class="w-3.5 h-3.5"></i>
-      <span>${greeting}</span>
-    `;
+    try {
+      supabase = window.supabase.createClient(url, key);
+      return true;
+    } catch (err) {
+      console.error('Error init Supabase:', err);
+      return false;
+    }
+  };
+
+  // --- Auth View & Navigation Management ---
+  const showAuthView = () => {
+    authSection.classList.remove('hidden');
+    appSection.classList.add('hidden');
+    bottomNav.classList.add('hidden');
+  };
+
+  const showAppView = () => {
+    authSection.classList.add('hidden');
+    appSection.classList.remove('hidden');
+    bottomNav.classList.remove('hidden');
+
+    if (currentUser) {
+      const email = currentUser.email || '';
+      const name = email.split('@')[0];
+      const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+      const initial = displayName.charAt(0);
+
+      greetingNameDisplay.textContent = `Good Morning, ${displayName}!`;
+      userAvatarContainer.textContent = initial;
+      profileAvatarInitial.textContent = initial;
+      profileNameDisplay.textContent = displayName;
+      profileEmailDisplay.textContent = email;
+
+      // Pre-fill user name into PDF modal if empty
+      if (!pdfNamaPegawai.value) {
+        pdfNamaPegawai.value = displayName;
+      }
+    }
+  };
+
+  // Auth Tabs (Login vs Register)
+  tabLoginBtn.addEventListener('click', () => {
+    isRegisterMode = false;
+    tabLoginBtn.className = 'flex-1 py-2.5 rounded-lg bg-white text-[#142D4E] shadow-sm font-bold transition';
+    tabRegisterBtn.className = 'flex-1 py-2.5 rounded-lg text-[#64748B] hover:text-[#142D4E] transition';
+    authSubmitText.textContent = 'Masuk';
+  });
+
+  tabRegisterBtn.addEventListener('click', () => {
+    isRegisterMode = true;
+    tabRegisterBtn.className = 'flex-1 py-2.5 rounded-lg bg-white text-[#142D4E] shadow-sm font-bold transition';
+    tabLoginBtn.className = 'flex-1 py-2.5 rounded-lg text-[#64748B] hover:text-[#142D4E] transition';
+    authSubmitText.textContent = 'Daftar Akun Baru';
+  });
+
+  togglePasswordBtn.addEventListener('click', () => {
+    const isPassword = authPassword.type === 'password';
+    authPassword.type = isPassword ? 'text' : 'password';
+    togglePasswordBtn.innerHTML = isPassword
+      ? '<i data-lucide="eye-off" class="w-4 h-4"></i>'
+      : '<i data-lucide="eye" class="w-4 h-4"></i>';
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!supabase) {
+      showToast('Harap hubungkan project Supabase melalui tombol Database di atas!', 'error');
+      openConfigModal();
+      return;
+    }
+
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+
+    authSubmitBtn.disabled = true;
+    authSubmitText.textContent = isRegisterMode ? 'Mendaftarkan...' : 'Memverifikasi...';
+
+    try {
+      if (isRegisterMode) {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+
+        if (data.session) {
+          currentUser = data.user;
+          showToast('Pendaftaran akun berhasil!', 'success');
+          await loadAllDataFromCloud();
+        } else {
+          showToast('Pendaftaran berhasil! Silakan langsung login dengan akun Anda.', 'success');
+          tabLoginBtn.click();
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+
+        currentUser = data.user;
+        showToast('Berhasil masuk! Memuat data...', 'success');
+        await loadAllDataFromCloud();
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Gagal autentikasi!', 'error');
+    } finally {
+      authSubmitBtn.disabled = false;
+      authSubmitText.textContent = isRegisterMode ? 'Daftar Akun Baru' : 'Masuk';
+    }
+  });
+
+  // Logout
+  const handleLogout = async () => {
+    if (!confirm('Apakah Anda yakin ingin keluar dari akun HadirKu?')) return;
+    if (supabase) await supabase.auth.signOut();
+
+    currentUser = null;
+    records = [];
+    allTasks = [];
+    showAuthView();
+    showToast('Berhasil keluar dari akun.', 'info');
+  };
+
+  logoutBtnProfile.addEventListener('click', handleLogout);
+
+  // --- 4 Tab Bottom Navigation Switching ---
+  const switchTab = (tabName) => {
+    activeTab = tabName;
+
+    document.querySelectorAll('.bottom-nav-item').forEach((item) => {
+      if (item.dataset.tab === tabName) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    tabContentHome.classList.add('hidden');
+    tabContentHistory.classList.add('hidden');
+    tabContentTasks.classList.add('hidden');
+    tabContentProfile.classList.add('hidden');
+
+    if (tabName === 'home') tabContentHome.classList.remove('hidden');
+    if (tabName === 'history') tabContentHistory.classList.remove('hidden');
+    if (tabName === 'tasks') tabContentTasks.classList.remove('hidden');
+    if (tabName === 'profile') tabContentProfile.classList.remove('hidden');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (window.lucide) window.lucide.createIcons();
   };
 
-  // --- Live Timer ---
-  const updateActiveDurationTimer = (clockInTime) => {
+  bottomNav.addEventListener('click', (e) => {
+    const item = e.target.closest('.bottom-nav-item');
+    if (!item) return;
+    switchTab(item.dataset.tab);
+  });
+
+  homeViewAllTasksLink.addEventListener('click', () => {
+    switchTab('tasks');
+  });
+
+  // --- Data Loading from Supabase Cloud ---
+  const loadAllDataFromCloud = async () => {
+    if (!supabase || !currentUser) return;
+
+    showAppView();
+
+    try {
+      const { data: attData, error: attErr } = await supabase
+        .from('attendance')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (attErr) throw attErr;
+      records = attData || [];
+
+      const { data: taskData, error: taskErr } = await supabase
+        .from('daily_tasks')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (taskErr) throw taskErr;
+      allTasks = taskData || [];
+
+      renderAll();
+    } catch (err) {
+      console.error('Error load cloud data:', err);
+      showToast('Gagal memuat data cloud: ' + err.message, 'error');
+    }
+  };
+
+  const getTodayRecord = () => {
+    const todayStr = getTodayDateString();
+    return records.find((r) => r.date === todayStr);
+  };
+
+  // --- 02. TODAY'S STATUS & CIRCULAR PROGRESS RING (Target 7 Jam: 07.30 - 14.30 WITA) ---
+  const updateCircularTimerAndState = () => {
+    const today = getTodayRecord();
+    todayFullDateText.textContent = formatDisplayDateLong(new Date());
+
+    if (!today || !today.clock_in) {
+      // 1. Belum Absen
+      todayStatusBadge.textContent = 'Belum Absen';
+      todayStatusBadge.className = 'text-xs px-3 py-1 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200';
+      todayCheckInText.textContent = '--:--';
+      todayCheckOutText.textContent = '--:--';
+      subPunchInText.textContent = '--:--';
+      subTotalHoursText.textContent = '00:00';
+      circularWorkedTime.textContent = '00:00';
+
+      // Ring empty
+      circularProgressArc.style.strokeDashoffset = CIRCLE_CIRCUMFERENCE;
+
+      // Timeline
+      timelineTimeMasuk.textContent = '--:--';
+      timelineDotMasuk.className = 'timeline-dot -left-6 absolute top-1 bg-slate-300';
+      timelineTimePulang.textContent = '--:--';
+      timelineDotPulang.className = 'timeline-dot -left-6 absolute top-1 bg-slate-300';
+
+    } else if (today.clock_in && !today.clock_out) {
+      // 2. Sedang Bekerja (Live Timer berjalan terhadap target 7 jam)
+      todayStatusBadge.textContent = 'Sedang Bekerja';
+      todayStatusBadge.className = 'text-xs px-3 py-1 rounded-full font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200';
+      
+      const checkInAmPm = formatTimeAmPm(today.clock_in);
+      todayCheckInText.textContent = checkInAmPm;
+      todayCheckOutText.textContent = '--:--';
+      subPunchInText.textContent = checkInAmPm;
+
+      // Timeline
+      timelineTimeMasuk.textContent = checkInAmPm;
+      timelineDotMasuk.className = 'timeline-dot -left-6 absolute top-1 bg-[#16A34A] border-white shadow-[0_0_8px_rgba(22,163,74,0.5)]';
+      timelineTimePulang.textContent = '--:--';
+      timelineDotPulang.className = 'timeline-dot -left-6 absolute top-1 bg-slate-300';
+
+      // Hitung live durasi kerja
+      const dur = calculateDuration(today.clock_in, getFormattedCurrentTime());
+      if (dur) {
+        circularWorkedTime.textContent = dur.formattedText;
+        subTotalHoursText.textContent = dur.formattedText;
+
+        // Target: 7 jam (420 menit)
+        const percent = Math.min(100, (dur.totalMinutes / TARGET_WORK_MINUTES) * 100);
+        const offset = CIRCLE_CIRCUMFERENCE - (percent / 100) * CIRCLE_CIRCUMFERENCE;
+        circularProgressArc.style.strokeDashoffset = offset;
+      }
+
+    } else if (today.clock_in && today.clock_out) {
+      // 3. Selesai Bekerja
+      todayStatusBadge.textContent = 'Selesai';
+      todayStatusBadge.className = 'text-xs px-3 py-1 rounded-full font-bold bg-slate-100 text-[#142D4E] border border-slate-200';
+
+      const checkInAmPm = formatTimeAmPm(today.clock_in);
+      const checkOutAmPm = formatTimeAmPm(today.clock_out);
+
+      todayCheckInText.textContent = checkInAmPm;
+      todayCheckOutText.textContent = checkOutAmPm;
+      subPunchInText.textContent = checkInAmPm;
+
+      // Timeline
+      timelineTimeMasuk.textContent = checkInAmPm;
+      timelineDotMasuk.className = 'timeline-dot -left-6 absolute top-1 bg-[#16A34A]';
+      timelineTimePulang.textContent = checkOutAmPm;
+      timelineDotPulang.className = 'timeline-dot -left-6 absolute top-1 bg-[#142D4E]';
+
+      const dur = calculateDuration(today.clock_in, today.clock_out);
+      if (dur) {
+        circularWorkedTime.textContent = dur.formattedText;
+        subTotalHoursText.textContent = dur.formattedText;
+
+        const percent = Math.min(100, (dur.totalMinutes / TARGET_WORK_MINUTES) * 100);
+        const offset = CIRCLE_CIRCUMFERENCE - (percent / 100) * CIRCLE_CIRCUMFERENCE;
+        circularProgressArc.style.strokeDashoffset = offset;
+      }
+    }
+  };
+
+  // --- 04. KALENDER MINGGUAN (Senin s/d Minggu) ---
+  const renderWeeklyCalendar = () => {
+    weeklyCalendarGrid.innerHTML = '';
     const now = new Date();
-    const [inH, inM, inS = 0] = clockInTime.split(':').map(Number);
-    const inDate = new Date();
-    inDate.setHours(inH, inM, inS, 0);
+    const currentDay = now.getDay();
+    const distanceToMonday = (currentDay + 6) % 7;
 
-    let diffSec = Math.floor((now.getTime() - inDate.getTime()) / 1000);
-    if (diffSec < 0) diffSec = 0;
+    const mondayDate = new Date(now);
+    mondayDate.setDate(now.getDate() - distanceToMonday);
 
-    const h = Math.floor(diffSec / 3600);
-    const m = Math.floor((diffSec % 3600) / 60);
-    const s = diffSec % 60;
+    const sundayDate = new Date(mondayDate);
+    sundayDate.setDate(mondayDate.getDate() + 6);
 
-    activeDurationTimerEl.textContent = `${padZero(h)}j ${padZero(m)}m ${padZero(s)}d`;
+    weekRangeLabel.textContent = `${mondayDate.getDate()} - ${sundayDate.getDate()} ${now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`;
+
+    const dayLabels = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+    const todayStr = getTodayDateString();
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mondayDate);
+      d.setDate(mondayDate.getDate() + i);
+
+      const dStr = `${d.getFullYear()}-${padZero(d.getMonth() + 1)}-${padZero(d.getDate())}`;
+      const isToday = dStr === todayStr;
+
+      const record = records.find((r) => r.date === dStr);
+      const isHadir = record && record.clock_in;
+
+      const item = document.createElement('div');
+      item.className = `cal-day-item flex flex-col items-center py-2 px-1 cursor-pointer ${
+        isToday ? 'today' : ''
+      }`;
+      item.dataset.date = dStr;
+
+      item.innerHTML = `
+        <span class="text-[10px] font-semibold text-[#64748B] block">${dayLabels[i]}</span>
+        <span class="text-xs font-extrabold my-1 block ${isToday ? 'text-[#168C85]' : 'text-[#172B4D]'}">${d.getDate()}</span>
+        <div class="w-1.5 h-1.5 rounded-full ${
+          isHadir ? 'bg-[#16A34A]' : isToday ? 'bg-[#14BBA6]' : 'bg-transparent'
+        }"></div>
+      `;
+
+      weeklyCalendarGrid.appendChild(item);
+    }
   };
 
-  // --- UI Update: Today Attendance ---
-  const renderTodayStatus = () => {
-    const today = getTodayRecord();
+  // Click on Calendar Day -> Shows Detail Modal
+  weeklyCalendarGrid.addEventListener('click', (e) => {
+    const item = e.target.closest('.cal-day-item');
+    if (!item) return;
 
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
+    const dateStr = item.dataset.date;
+    const record = records.find((r) => r.date === dateStr);
 
-    if (!today || (!today.clockIn && !['Izin', 'Cuti', 'Sakit'].includes(today.status))) {
-      todayStatusPillEl.textContent = 'Belum Absen';
-      todayStatusPillEl.className = 'text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-800 text-slate-300 border border-slate-700';
-      todayClockInTextEl.textContent = '--:--';
-      todayClockOutTextEl.textContent = '--:--';
-      workingTimerContainerEl.classList.add('hidden');
-      todayCompletedActions.classList.add('hidden');
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    calDetailDateTitle.textContent = formatDisplayDateLong(dateObj);
 
-      clockInBtn.disabled = false;
-      clockOutBtn.disabled = true;
-      clockInBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-      updateStatusSelectionUI();
-      renderTasks();
-      return;
-    }
-
-    if (today.notes && !todayNotesInput.value) {
-      todayNotesInput.value = today.notes;
-    }
-
-    const isLeave = ['Izin', 'Cuti', 'Sakit'].includes(today.status);
-    if (isLeave) {
-      todayStatusPillEl.textContent = today.status;
-      todayStatusPillEl.className = 'text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40';
-
-      todayClockInTextEl.textContent = 'Izin/Libur';
-      todayClockOutTextEl.textContent = 'Izin/Libur';
-      workingTimerContainerEl.classList.add('hidden');
-
-      workingActionButtons.classList.add('hidden');
-      leaveActionButton.classList.add('hidden');
-      todayCompletedActions.classList.remove('hidden');
-      renderTasks();
-      return;
-    }
-
-    if (today.clockIn && !today.clockOut) {
-      // Sedang Bekerja
-      todayStatusPillEl.textContent = `Bekerja (${today.status})`;
-      todayStatusPillEl.className = 'text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-
-      todayClockInTextEl.textContent = today.clockIn;
-      todayClockOutTextEl.textContent = '--:--';
-
-      workingTimerContainerEl.classList.remove('hidden');
-      todayCompletedActions.classList.add('hidden');
-      workingActionButtons.classList.remove('hidden');
-      leaveActionButton.classList.add('hidden');
-
-      clockInBtn.disabled = true;
-      clockInBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      clockOutBtn.disabled = false;
-      clockOutBtn.classList.remove('opacity-40', 'bg-slate-800', 'cursor-not-allowed');
-
-      updateActiveDurationTimer(today.clockIn);
-      timerInterval = setInterval(() => {
-        updateActiveDurationTimer(today.clockIn);
-      }, 1000);
-    } else if (today.clockIn && today.clockOut) {
-      // Selesai Bekerja
-      todayStatusPillEl.textContent = 'Sudah Pulang';
-      todayStatusPillEl.className = 'text-xs px-2.5 py-1 rounded-full font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40';
-
-      todayClockInTextEl.textContent = today.clockIn;
-      todayClockOutTextEl.textContent = today.clockOut;
-
-      const dur = calculateDuration(today.clockIn, today.clockOut);
-      workingTimerContainerEl.classList.remove('hidden');
-      document.querySelector('#workingTimerContainer span.text-[11px]').textContent = 'Durasi Kerja';
-      activeDurationTimerEl.textContent = dur ? `${dur.hours}j ${dur.minutes}m` : '-';
-
-      clockInBtn.disabled = true;
-      clockOutBtn.disabled = true;
-      workingActionButtons.classList.remove('hidden');
-      leaveActionButton.classList.add('hidden');
-      todayCompletedActions.classList.remove('hidden');
-    }
-
-    renderTasks();
-    if (window.lucide) window.lucide.createIcons();
-  };
-
-  const updateStatusSelectionUI = () => {
-    const isLeave = ['Izin', 'Cuti', 'Sakit'].includes(selectedStatus);
-    const today = getTodayRecord();
-
-    if (today && (today.clockOut || ['Izin', 'Cuti', 'Sakit'].includes(today.status))) {
-      workingActionButtons.classList.add('hidden');
-      leaveActionButton.classList.add('hidden');
-      todayCompletedActions.classList.remove('hidden');
-      return;
-    }
-
-    if (isLeave) {
-      workingActionButtons.classList.add('hidden');
-      leaveActionButton.classList.remove('hidden');
-      logLeaveBtnText.textContent = `Catat ${selectedStatus} Hari Ini`;
+    if (record && record.clock_in) {
+      const dur = record.clock_out ? calculateDuration(record.clock_in, record.clock_out) : null;
+      calDetailBody.innerHTML = `
+        <div class="p-3 rounded-xl bg-slate-50 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[#64748B]">Status:</span>
+            <span class="font-bold text-[#16A34A]">${record.status || 'Hadir'}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[#64748B]">Jam Masuk:</span>
+            <span class="font-bold font-mono">${formatTimeAmPm(record.clock_in)}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[#64748B]">Jam Pulang:</span>
+            <span class="font-bold font-mono">${record.clock_out ? formatTimeAmPm(record.clock_out) : 'Belum absen pulang'}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[#64748B]">Total Durasi:</span>
+            <span class="font-bold text-[#168C85]">${dur ? dur.formattedText + ' jam' : '-'}</span>
+          </div>
+        </div>
+      `;
     } else {
-      workingActionButtons.classList.remove('hidden');
-      leaveActionButton.classList.add('hidden');
+      calDetailBody.innerHTML = `
+        <div class="p-3 rounded-xl bg-slate-50 text-center text-[#64748B] text-xs">
+          Belum ada catatan absensi untuk tanggal ini.
+        </div>
+      `;
     }
+
+    calendarDetailModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  closeCalDetailModalBtn.addEventListener('click', () => {
+    calendarDetailModal.classList.add('hidden');
+  });
+
+  calendarDetailModal.addEventListener('click', (e) => {
+    if (e.target === calendarDetailModal) calendarDetailModal.classList.add('hidden');
+  });
+
+  // --- 05. TARGET TASK LOGIC ---
+  const getTodayTasks = () => {
+    const todayStr = getTodayDateString();
+    return allTasks.filter((t) => t.date === todayStr);
   };
 
-  statusButtonGroup.addEventListener('click', (e) => {
-    const btn = e.target.closest('.status-btn');
-    if (!btn) return;
+  const renderTaskProgressAndHomePreview = () => {
+    const todayTasks = getTodayTasks();
+    const totalCount = todayTasks.length;
+    const completedCount = todayTasks.filter((t) => t.completed).length;
+    const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    statusButtonGroup.querySelectorAll('.status-btn').forEach((b) => b.classList.remove('active-status'));
-    btn.classList.add('active-status');
-    selectedStatus = btn.dataset.status;
+    // Home Card Progress
+    homeTaskProgressCount.textContent = `${completedCount} dari ${totalCount} tugas selesai`;
+    homeTaskProgressBar.style.width = `${percent}%`;
 
-    updateStatusSelectionUI();
-  });
+    // Tasks Tab Header Progress
+    tasksSubtitleProgress.textContent = `${completedCount} dari ${totalCount} tugas selesai`;
+    tasksPercentBadge.textContent = `${percent}%`;
+    tasksProgressBar.style.width = `${percent}%`;
 
-  // --- Clock In & Clock Out Actions ---
-  clockInBtn.addEventListener('click', () => {
-    let today = getOrCreateTodayRecord();
+    // Render Home 3 Tasks Preview
+    homeTaskListPreview.innerHTML = '';
+    if (todayTasks.length === 0) {
+      homeTaskListPreview.innerHTML = `
+        <div class="text-center py-3 text-xs text-[#64748B]">
+          Belum ada target tugas hari ini.
+        </div>
+      `;
+    } else {
+      const sorted = [...todayTasks].sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1));
+      const previewSlice = sorted.slice(0, 3);
 
-    if (today.clockIn) {
-      showToast('Anda sudah melakukan Absen Masuk hari ini!', 'warning');
+      previewSlice.forEach((task) => {
+        const item = document.createElement('div');
+        item.className = `task-item flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 ${
+          task.completed ? 'completed' : ''
+        }`;
+
+        item.innerHTML = `
+          <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0 pr-2">
+            <input 
+              type="checkbox" 
+              class="quick-task-cb w-4 h-4 rounded text-[#168C85] focus:ring-0 cursor-pointer"
+              data-id="${task.id}"
+              ${task.completed ? 'checked' : ''}
+            />
+            <span class="task-title text-xs font-semibold text-[#172B4D] truncate select-none">
+              ${escapeHtml(task.title)}
+            </span>
+          </label>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${
+            task.priority === 'Tinggi' ? 'badge-priority-tinggi' : task.priority === 'Rendah' ? 'badge-priority-rendah' : 'badge-priority-sedang'
+          }">
+            ${task.priority || 'Sedang'}
+          </span>
+        `;
+        homeTaskListPreview.appendChild(item);
+      });
+    }
+
+    renderFullTaskList();
+  };
+
+  const renderFullTaskList = () => {
+    fullTaskListContainer.innerHTML = '';
+    const todayTasks = getTodayTasks();
+
+    let filtered = todayTasks;
+    if (taskFilter === 'completed') filtered = todayTasks.filter((t) => t.completed);
+    if (taskFilter === 'uncompleted') filtered = todayTasks.filter((t) => !t.completed);
+
+    if (filtered.length === 0) {
+      emptyTasksFullState.classList.remove('hidden');
       return;
     }
 
-    const currentTime = getFormattedCurrentTime();
-    today.status = selectedStatus;
-    today.clockIn = currentTime;
-    today.updatedAt = new Date().toISOString();
+    emptyTasksFullState.classList.add('hidden');
 
-    saveRecords();
-    renderAll();
-    showToast(`Absen Masuk berhasil dicatat pukul ${currentTime}! Selamat beraktivitas!`, 'success');
-  });
-
-  clockOutBtn.addEventListener('click', () => {
-    const today = getTodayRecord();
-    if (!today || !today.clockIn) {
-      showToast('Anda belum melakukan Absen Masuk!', 'warning');
-      return;
-    }
-
-    if (today.clockOut) {
-      showToast('Anda sudah melakukan Absen Pulang hari ini!', 'warning');
-      return;
-    }
-
-    const currentTime = getFormattedCurrentTime();
-    today.clockOut = currentTime;
-
-    const dur = calculateDuration(today.clockIn, currentTime);
-    today.durationMinutes = dur ? dur.totalMinutes : 0;
-    today.updatedAt = new Date().toISOString();
-
-    saveRecords();
-    renderAll();
-    showToast(
-      `Absen Pulang berhasil dicatat pukul ${currentTime}! Durasi: ${dur ? dur.formattedText : '0 menit'}`,
-      'success'
-    );
-  });
-
-  logLeaveBtn.addEventListener('click', () => {
-    let today = getOrCreateTodayRecord();
-
-    if (today.clockIn && !confirm(`Hari ini sudah absen masuk. Ubah status hari ini menjadi ${selectedStatus}?`)) {
-      return;
-    }
-
-    today.status = selectedStatus;
-    today.clockIn = null;
-    today.clockOut = null;
-    today.durationMinutes = 0;
-    today.updatedAt = new Date().toISOString();
-
-    saveRecords();
-    renderAll();
-    showToast(`Status ${selectedStatus} berhasil dicatat untuk hari ini!`, 'success');
-  });
-
-  todayNotesInput.addEventListener('change', () => {
-    const today = getOrCreateTodayRecord();
-    today.notes = todayNotesInput.value.trim();
-    saveRecords();
-  });
-
-  // --- DAILY TASK PLANNER (Opsi A) ---
-  const renderTasks = () => {
-    const today = getTodayRecord();
-    const tasks = today && Array.isArray(today.tasks) ? today.tasks : [];
-
-    taskListContainer.innerHTML = '';
-
-    if (tasks.length === 0) {
-      emptyTaskState.classList.remove('hidden');
-      taskProgressBadge.textContent = '0/0 Selesai';
-      taskProgressBar.style.width = '0%';
-      return;
-    }
-
-    emptyTaskState.classList.add('hidden');
-
-    const completedCount = tasks.filter((t) => t.completed).length;
-    const totalCount = tasks.length;
-    const percent = Math.round((completedCount / totalCount) * 100);
-
-    taskProgressBadge.textContent = `${completedCount}/${totalCount} Selesai (${percent}%)`;
-    taskProgressBar.style.width = `${percent}%`;
-
-    tasks.forEach((task) => {
-      const taskDiv = document.createElement('div');
-      taskDiv.className = `task-item flex items-center justify-between p-2.5 rounded-2xl bg-slate-950/70 border border-slate-800 ${
-        task.completed ? 'completed-task' : ''
+    filtered.forEach((task) => {
+      const card = document.createElement('div');
+      card.className = `task-item hadirku-card p-3.5 flex items-start justify-between gap-3 ${
+        task.completed ? 'completed' : ''
       }`;
 
-      taskDiv.innerHTML = `
-        <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0 pr-2">
+      card.innerHTML = `
+        <div class="flex items-start gap-3 flex-1 min-w-0">
           <input 
             type="checkbox" 
-            class="toggle-task-cb w-4 h-4 rounded-lg bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+            class="full-task-cb mt-1 w-4 h-4 rounded text-[#168C85] focus:ring-0 cursor-pointer"
             data-id="${task.id}"
             ${task.completed ? 'checked' : ''}
           />
-          <span class="task-title text-xs sm:text-sm text-slate-200 select-none truncate font-medium">
-            ${escapeHtml(task.title)}
-          </span>
-        </label>
-        <button 
-          type="button" 
-          class="delete-task-btn p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-slate-800/80 transition"
-          data-id="${task.id}"
-          title="Hapus task"
-        >
-          <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+          <div class="space-y-1 overflow-hidden">
+            <h4 class="task-title text-xs font-bold text-[#142D4E] truncate select-none">
+              ${escapeHtml(task.title)}
+            </h4>
+            ${
+              task.description
+                ? `<p class="text-[11px] text-[#64748B] line-clamp-2">${escapeHtml(task.description)}</p>`
+                : ''
+            }
+            <div class="flex items-center gap-2 pt-0.5">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                task.priority === 'Tinggi' ? 'badge-priority-tinggi' : task.priority === 'Rendah' ? 'badge-priority-rendah' : 'badge-priority-sedang'
+              }">
+                ${task.priority || 'Sedang'}
+              </span>
+              ${
+                task.due_date
+                  ? `<span class="text-[10px] text-[#64748B] flex items-center gap-1 font-medium">
+                      <i data-lucide="calendar" class="w-3 h-3"></i>
+                      ${formatDisplayDateShort(task.due_date)}
+                    </span>`
+                  : ''
+              }
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="delete-task-btn p-1.5 rounded-lg text-slate-400 hover:text-[#DC4545] hover:bg-rose-50 transition" data-id="${task.id}" title="Hapus Tugas">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
         </button>
       `;
 
-      taskListContainer.appendChild(taskDiv);
+      fullTaskListContainer.appendChild(card);
     });
 
     if (window.lucide) window.lucide.createIcons();
   };
 
-  const escapeHtml = (text) => {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+  // Task Filter Tabs in Tugas Screen
+  document.querySelectorAll('.task-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      taskFilter = btn.dataset.filter;
+      document.querySelectorAll('.task-filter-btn').forEach((b) => {
+        b.className = 'task-filter-btn px-3.5 py-1.5 rounded-xl bg-white text-[#64748B] border border-[#E2E8F0] hover:text-[#142D4E] transition';
+      });
+      btn.className = 'task-filter-btn px-3.5 py-1.5 rounded-xl bg-[#142D4E] text-white shadow-sm transition font-bold';
+      renderFullTaskList();
+    });
+  });
+
+  const handleTaskToggle = async (taskId, isChecked) => {
+    if (!currentUser) return;
+    try {
+      await supabase
+        .from('daily_tasks')
+        .update({ completed: isChecked })
+        .eq('id', taskId);
+
+      const target = allTasks.find((t) => t.id === taskId);
+      if (target) target.completed = isChecked;
+
+      renderTaskProgressAndHomePreview();
+      if (isChecked) showToast('Tugas selesai dicentang!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal update tugas di cloud', 'error');
+    }
   };
 
-  addTaskForm.addEventListener('submit', (e) => {
+  homeTaskListPreview.addEventListener('change', (e) => {
+    const cb = e.target.closest('.quick-task-cb');
+    if (cb) handleTaskToggle(cb.dataset.id, cb.checked);
+  });
+
+  fullTaskListContainer.addEventListener('change', (e) => {
+    const cb = e.target.closest('.full-task-cb');
+    if (cb) handleTaskToggle(cb.dataset.id, cb.checked);
+  });
+
+  fullTaskListContainer.addEventListener('click', async (e) => {
+    const delBtn = e.target.closest('.delete-task-btn');
+    if (delBtn && currentUser) {
+      const taskId = delBtn.dataset.id;
+      try {
+        await supabase.from('daily_tasks').delete().eq('id', taskId);
+        allTasks = allTasks.filter((t) => t.id !== taskId);
+        renderTaskProgressAndHomePreview();
+        showToast('Tugas telah dihapus.', 'info');
+      } catch (err) {
+        showToast('Gagal menghapus tugas dari cloud', 'error');
+      }
+    }
+  });
+
+  // Add Task Modal Handlers
+  openAddTaskModalBtn.addEventListener('click', () => {
+    modalTaskTitle.value = '';
+    modalTaskDesc.value = '';
+    modalTaskDueDate.value = getTodayDateString();
+    modalTaskPriority.value = 'Sedang';
+    addTaskModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  const closeAddTaskModal = () => {
+    addTaskModal.classList.add('hidden');
+    addTaskModalForm.reset();
+  };
+
+  closeAddTaskModalBtn.addEventListener('click', closeAddTaskModal);
+  cancelAddTaskModalBtn.addEventListener('click', closeAddTaskModal);
+  addTaskModal.addEventListener('click', (e) => {
+    if (e.target === addTaskModal) closeAddTaskModal();
+  });
+
+  addTaskModalForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const title = newTaskInput.value.trim();
+    if (!currentUser) return;
+
+    const title = modalTaskTitle.value.trim();
     if (!title) return;
 
-    const today = getOrCreateTodayRecord();
-    if (!Array.isArray(today.tasks)) today.tasks = [];
+    const desc = modalTaskDesc.value.trim();
+    const dueDate = modalTaskDueDate.value || null;
+    const priority = modalTaskPriority.value || 'Sedang';
+    const todayStr = getTodayDateString();
 
-    today.tasks.push({
-      id: `task_${Date.now()}`,
-      title: title,
-      completed: false
-    });
+    try {
+      const { data, error } = await supabase
+        .from('daily_tasks')
+        .insert({
+          user_id: currentUser.id,
+          date: todayStr,
+          title: title,
+          description: desc,
+          due_date: dueDate,
+          priority: priority,
+          completed: false
+        })
+        .select()
+        .single();
 
-    saveRecords();
-    newTaskInput.value = '';
-    renderTasks();
-    showToast('Task berhasil ditambahkan!', 'success');
-  });
+      if (error) throw error;
 
-  taskListContainer.addEventListener('click', (e) => {
-    const cb = e.target.closest('.toggle-task-cb');
-    if (cb) {
-      const taskId = cb.dataset.id;
-      const today = getTodayRecord();
-      if (!today || !today.tasks) return;
-
-      const target = today.tasks.find((t) => t.id === taskId);
-      if (target) {
-        target.completed = cb.checked;
-        saveRecords();
-        renderTasks();
-        if (target.completed) {
-          showToast('Keren! Task selesai dicentang.', 'success');
-        }
-      }
-      return;
-    }
-
-    const delBtn = e.target.closest('.delete-task-btn');
-    if (delBtn) {
-      const taskId = delBtn.dataset.id;
-      const today = getTodayRecord();
-      if (!today || !today.tasks) return;
-
-      today.tasks = today.tasks.filter((t) => t.id !== taskId);
-      saveRecords();
-      renderTasks();
-      showToast('Task telah dihapus.', 'info');
+      allTasks.push(data);
+      closeAddTaskModal();
+      renderTaskProgressAndHomePreview();
+      showToast('Tugas berhasil disimpan!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal menyimpan tugas ke cloud: ' + err.message, 'error');
     }
   });
 
-  // --- Statistics ---
-  const renderStatistics = () => {
-    const now = new Date();
-    const currentYearMonth = `${now.getFullYear()}-${padZero(now.getMonth() + 1)}`;
-    const currentMonthRecords = records.filter((r) => r.date.startsWith(currentYearMonth));
+  // --- 06. RINGKASAN KEHADIRAN BULANAN (Dihitung Nyata dari Data) ---
+  const renderMonthlyCalculations = () => {
+    const year = currentHistoryPeriod.getFullYear();
+    const month = currentHistoryPeriod.getMonth();
+    const monthPrefix = `${year}-${padZero(month + 1)}`;
 
-    let workDaysCount = 0;
-    let totalMinutes = 0;
-    let leaveDaysCount = 0;
+    homeMonthLabel.textContent = currentHistoryPeriod.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    currentPeriodLabel.textContent = homeMonthLabel.textContent;
+    pdfPeriodeDisplay.value = homeMonthLabel.textContent;
 
-    currentMonthRecords.forEach((r) => {
-      if (['Hadir (WFO)', 'WFH'].includes(r.status) && r.clockIn) {
-        workDaysCount++;
-        if (r.durationMinutes) {
-          totalMinutes += r.durationMinutes;
-        } else if (r.clockIn && r.clockOut) {
-          const d = calculateDuration(r.clockIn, r.clockOut);
-          if (d) totalMinutes += d.totalMinutes;
-        }
-      } else if (['Izin', 'Cuti', 'Sakit'].includes(r.status)) {
-        leaveDaysCount++;
+    const monthRecords = records.filter((r) => r.date.startsWith(monthPrefix));
+
+    let hadir = 0;
+    let terlambat = 0;
+    let izin = 0;
+    let alpa = 0;
+    let totalMinutesWorked = 0;
+
+    monthRecords.forEach((r) => {
+      if (r.status === 'Hadir' || r.status === 'Hadir (WFO)' || r.status === 'WFH') {
+        hadir++;
+      } else if (r.status === 'Izin' || r.status === 'Cuti' || r.status === 'Sakit') {
+        izin++;
+      } else if (r.status === 'Terlambat') {
+        terlambat++;
+      } else if (r.status === 'Alpa') {
+        alpa++;
+      }
+
+      if (r.duration_minutes) {
+        totalMinutesWorked += r.duration_minutes;
+      } else if (r.clock_in && r.clock_out) {
+        const d = calculateDuration(r.clock_in, r.clock_out);
+        if (d) totalMinutesWorked += d.totalMinutes;
       }
     });
 
-    const totalHoursFloat = (totalMinutes / 60).toFixed(1);
-    const avgHoursFloat = workDaysCount > 0 ? (totalMinutes / 60 / workDaysCount).toFixed(1) : '0.0';
+    const totH = Math.floor(totalMinutesWorked / 60);
+    const totM = totalMinutesWorked % 60;
+    const totalHoursStr = `${padZero(totH)}:${padZero(totM)}`;
 
-    statTotalDaysEl.textContent = `${workDaysCount} Hari`;
-    statTotalHoursEl.textContent = `${totalHoursFloat} Jam`;
-    statAvgHoursEl.textContent = `${avgHoursFloat} Jam`;
-    statLeaveDaysEl.textContent = `${leaveDaysCount} Hari`;
+    // Update Home Summary
+    summaryHadirCount.textContent = hadir;
+    summaryTerlambatCount.textContent = terlambat;
+    summaryIzinCount.textContent = izin;
+    summaryTotalHoursCount.textContent = totalHoursStr;
+
+    // Update History Badges
+    histHadirCount.textContent = hadir;
+    histTerlambatCount.textContent = terlambat;
+    histIzinCount.textContent = izin;
+    histAlpaCount.textContent = alpa;
+
+    renderHistoryList(monthRecords);
   };
 
-  // --- History List (Mobile Friendly Cards) ---
-  const renderHistoryList = () => {
+  const renderHistoryList = (monthRecords) => {
     historyListContainer.innerHTML = '';
 
-    if (records.length === 0) {
+    if (monthRecords.length === 0) {
       emptyHistoryState.classList.remove('hidden');
       return;
     }
 
     emptyHistoryState.classList.add('hidden');
 
-    records.forEach((r) => {
+    monthRecords.forEach((r) => {
       const card = document.createElement('div');
-      card.className = 'p-4 hover:bg-slate-900/50 transition flex flex-col gap-2.5';
+      card.className = 'hadirku-card p-4 space-y-2';
 
-      let durationText = '-';
-      if (r.clockIn && r.clockOut) {
-        const d = calculateDuration(r.clockIn, r.clockOut);
-        durationText = d ? `${d.hours}j ${d.minutes}m` : '-';
-      } else if (r.clockIn && !r.clockOut && r.date === getTodayDateString()) {
-        durationText = '<span class="text-emerald-400 font-medium">Berjalan</span>';
+      let durText = '-';
+      if (r.clock_in && r.clock_out) {
+        const d = calculateDuration(r.clock_in, r.clock_out);
+        durText = d ? `${d.hours}j ${d.minutes}m` : '-';
       }
-
-      // Tasks summary
-      const taskCount = Array.isArray(r.tasks) ? r.tasks.length : 0;
-      const completedTaskCount = Array.isArray(r.tasks) ? r.tasks.filter((t) => t.completed).length : 0;
 
       card.innerHTML = `
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-xs sm:text-sm text-slate-100">${formatShortDate(r.date)}</span>
-            ${getStatusBadgeHtml(r.status)}
+          <span class="text-xs font-bold text-[#142D4E]">${formatDisplayDateShort(r.date)}</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-[#16A34A] border border-emerald-200">
+            ${r.status || 'Hadir'}
+          </span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs pt-1">
+          <div class="p-2 rounded-xl bg-slate-50">
+            <span class="text-[10px] text-[#64748B] block">Masuk</span>
+            <span class="font-bold text-[#142D4E] font-mono">${formatTimeAmPm(r.clock_in)}</span>
           </div>
-          <div class="flex items-center gap-1">
-            <button type="button" class="edit-hist-btn p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition" data-id="${r.id}" title="Edit Data">
-              <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
-            </button>
-            <button type="button" class="delete-hist-btn p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition" data-id="${r.id}" title="Hapus Data">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
+          <div class="p-2 rounded-xl bg-slate-50">
+            <span class="text-[10px] text-[#64748B] block">Pulang</span>
+            <span class="font-bold text-[#142D4E] font-mono">${r.clock_out ? formatTimeAmPm(r.clock_out) : '-'}</span>
+          </div>
+          <div class="p-2 rounded-xl bg-slate-50">
+            <span class="text-[10px] text-[#64748B] block">Durasi</span>
+            <span class="font-bold text-[#168C85]">${durText}</span>
           </div>
         </div>
-
-        <div class="grid grid-cols-3 gap-2 text-xs bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800/80">
-          <div>
-            <span class="text-[10px] text-slate-500 block">Masuk</span>
-            <span class="font-mono text-slate-300 font-semibold">${r.clockIn || '-'}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">Pulang</span>
-            <span class="font-mono text-slate-300 font-semibold">${r.clockOut || '-'}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">Durasi</span>
-            <span class="text-indigo-400 font-semibold">${durationText}</span>
-          </div>
-        </div>
-
-        ${
-          taskCount > 0
-            ? `<div class="text-[11px] text-slate-400 flex items-center gap-1.5">
-                <i data-lucide="check-square" class="w-3 h-3 text-indigo-400"></i>
-                <span>Task: <strong>${completedTaskCount}/${taskCount}</strong> selesai</span>
-              </div>`
-            : ''
-        }
-
-        ${
-          r.notes
-            ? `<div class="text-[11px] text-slate-400 italic bg-slate-800/40 px-2.5 py-1 rounded-xl">
-                "${escapeHtml(r.notes)}"
-              </div>`
-            : ''
-        }
       `;
 
       historyListContainer.appendChild(card);
@@ -683,194 +1043,39 @@
     if (window.lucide) window.lucide.createIcons();
   };
 
-  const getStatusBadgeHtml = (status) => {
-    switch (status) {
-      case 'Hadir (WFO)':
-        return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">WFO</span>`;
-      case 'WFH':
-        return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">WFH</span>`;
-      case 'Izin':
-        return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">Izin</span>`;
-      case 'Cuti':
-        return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">Cuti</span>`;
-      case 'Sakit':
-        return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">Sakit</span>`;
-      default:
-        return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400">${status}</span>`;
-    }
-  };
-
-  // History List Actions (Edit / Delete)
-  historyListContainer.addEventListener('click', (e) => {
-    const editBtn = e.target.closest('.edit-hist-btn');
-    if (editBtn) {
-      openEditModal(editBtn.dataset.id);
-      return;
-    }
-
-    const deleteBtn = e.target.closest('.delete-hist-btn');
-    if (deleteBtn) {
-      const id = deleteBtn.dataset.id;
-      const targetRecord = records.find((r) => r.id === id);
-      if (targetRecord && confirm(`Hapus absensi tanggal ${targetRecord.date}?`)) {
-        records = records.filter((r) => r.id !== id);
-        saveRecords();
-        renderAll();
-        showToast('Data absensi berhasil dihapus.', 'info');
-      }
-    }
+  prevMonthBtn.addEventListener('click', () => {
+    currentHistoryPeriod.setMonth(currentHistoryPeriod.getMonth() - 1);
+    renderMonthlyCalculations();
   });
 
-  // --- Modal Operations ---
-  const openModal = (title = 'Tambah Data Absensi') => {
-    modalTitle.innerHTML = `<i data-lucide="edit-3" class="w-4 h-4 text-indigo-400"></i> ${title}`;
-    entryModal.classList.remove('hidden');
-    if (window.lucide) window.lucide.createIcons();
-  };
-
-  const closeModal = () => {
-    entryModal.classList.add('hidden');
-    entryForm.reset();
-    formEntryId.value = '';
-  };
-
-  closeModalBtn.addEventListener('click', closeModal);
-  cancelModalBtn.addEventListener('click', closeModal);
-  entryModal.addEventListener('click', (e) => {
-    if (e.target === entryModal) closeModal();
+  nextMonthBtn.addEventListener('click', () => {
+    currentHistoryPeriod.setMonth(currentHistoryPeriod.getMonth() + 1);
+    renderMonthlyCalculations();
   });
 
-  const openEditModal = (id) => {
-    const rec = records.find((r) => r.id === id);
-    if (!rec) return;
-
-    formEntryId.value = rec.id;
-    formDate.value = rec.date;
-    formStatus.value = rec.status;
-    formClockIn.value = rec.clockIn || '';
-    formClockOut.value = rec.clockOut || '';
-    formNotes.value = rec.notes || '';
-
-    handleModalStatusTimesVisibility();
-    openModal('Edit Data Absensi');
-  };
-
-  const handleModalStatusTimesVisibility = () => {
-    const isLeave = ['Izin', 'Cuti', 'Sakit'].includes(formStatus.value);
-    if (isLeave) {
-      formTimesRow.classList.add('hidden');
-    } else {
-      formTimesRow.classList.remove('hidden');
-    }
-  };
-
-  formStatus.addEventListener('change', handleModalStatusTimesVisibility);
-
-  quickManualBtn.addEventListener('click', () => {
-    formEntryId.value = '';
-    formDate.value = getTodayDateString();
-    formStatus.value = 'Hadir (WFO)';
-    formClockIn.value = '08:00';
-    formClockOut.value = '17:00';
-    formNotes.value = '';
-    handleModalStatusTimesVisibility();
-    openModal('Input Absensi Manual');
-  });
-
-  editTodayEntryBtn.addEventListener('click', () => {
-    const today = getTodayRecord();
-    if (today) openEditModal(today.id);
-  });
-
-  entryForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    const id = formEntryId.value;
-    const date = formDate.value;
-    const status = formStatus.value;
-    const isLeave = ['Izin', 'Cuti', 'Sakit'].includes(status);
-    const clockIn = isLeave ? null : formClockIn.value || null;
-    const clockOut = isLeave ? null : formClockOut.value || null;
-    const notes = formNotes.value.trim();
-
-    let durationMinutes = 0;
-    if (clockIn && clockOut) {
-      const d = calculateDuration(clockIn, clockOut);
-      durationMinutes = d ? d.totalMinutes : 0;
-    }
-
-    if (id) {
-      const existing = records.find((r) => r.id === id);
-      if (existing) {
-        existing.date = date;
-        existing.status = status;
-        existing.clockIn = clockIn;
-        existing.clockOut = clockOut;
-        existing.durationMinutes = durationMinutes;
-        existing.notes = notes;
-        existing.updatedAt = new Date().toISOString();
-      }
-    } else {
-      const existingDate = records.find((r) => r.date === date);
-      if (existingDate) {
-        if (!confirm(`Catatan untuk tanggal ${date} sudah ada. Ingin memperbaruinya?`)) return;
-        existingDate.status = status;
-        existingDate.clockIn = clockIn;
-        existingDate.clockOut = clockOut;
-        existingDate.durationMinutes = durationMinutes;
-        existingDate.notes = notes;
-        existingDate.updatedAt = new Date().toISOString();
-      } else {
-        records.push({
-          id: `rec_${Date.now()}`,
-          date,
-          status,
-          clockIn,
-          clockOut,
-          durationMinutes,
-          notes,
-          tasks: [],
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
-
-    records.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
-    saveRecords();
-    closeModal();
-    renderAll();
-    showToast('Data absensi tersimpan!', 'success');
-  });
-
-  // --- Export CSV ---
+  // Export CSV
   exportCsvBtn.addEventListener('click', () => {
     if (records.length === 0) {
-      showToast('Belum ada data untuk di-export!', 'warning');
+      showToast('Belum ada data untuk diekspor!', 'warning');
       return;
     }
 
-    const headers = ['Tanggal', 'Status', 'Jam Masuk', 'Jam Pulang', 'Durasi (Menit)', 'Task Selesai', 'Total Task', 'Catatan'];
-    const rows = records.map((r) => {
-      const taskCount = Array.isArray(r.tasks) ? r.tasks.length : 0;
-      const completedCount = Array.isArray(r.tasks) ? r.tasks.filter((t) => t.completed).length : 0;
-      return [
-        r.date,
-        r.status,
-        r.clockIn || '-',
-        r.clockOut || '-',
-        r.durationMinutes || 0,
-        completedCount,
-        taskCount,
-        `"${(r.notes || '').replace(/"/g, '""')}"`
-      ];
-    });
+    const headers = ['Tanggal', 'Status', 'Jam Masuk', 'Jam Pulang', 'Durasi (Menit)', 'Catatan'];
+    const rows = records.map((r) => [
+      r.date,
+      r.status,
+      r.clock_in || '-',
+      r.clock_out || '-',
+      r.duration_minutes || 0,
+      `"${(r.notes || '').replace(/"/g, '""')}"`
+    ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `AbsensiKu_Export_${getTodayDateString()}.csv`;
+    link.download = `HadirKu_Riwayat_${getTodayDateString()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -879,112 +1084,421 @@
     showToast('File CSV berhasil diunduh!', 'success');
   });
 
-  // --- Backup & Restore ---
-  backupDataBtn.addEventListener('click', () => {
-    if (records.length === 0) {
-      showToast('Belum ada data untuk di-backup!', 'warning');
+  // --- 03. ABSEN MASUK & PULANG (TERPUSAT DI TOMBOL FINGERPRINT) ---
+  const triggerAbsenMasuk = async () => {
+    if (!currentUser) return;
+    const todayStr = getTodayDateString();
+    let today = getTodayRecord();
+
+    if (today && today.clock_in) {
+      showToast('Anda sudah melakukan Absen Masuk hari ini!', 'warning');
       return;
     }
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records, null, 2));
-    const a = document.createElement('a');
-    a.href = dataStr;
-    a.download = `AbsensiKu_Backup_${getTodayDateString()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    showToast('Backup JSON berhasil di-download!', 'success');
+
+    const currentTime = getFormattedCurrentTime();
+
+    try {
+      const payload = {
+        user_id: currentUser.id,
+        date: todayStr,
+        status: 'Hadir',
+        clock_in: currentTime,
+        clock_out: null,
+        duration_minutes: 0,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('attendance')
+        .upsert(payload, { onConflict: 'user_id,date' })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (!today) {
+        records.unshift(data);
+      } else {
+        Object.assign(today, data);
+      }
+
+      showAbsenSuccessModal('masuk', formatTimeAmPm(currentTime));
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal Absen Masuk: ' + err.message, 'error');
+    }
+  };
+
+  const triggerAbsenPulang = async () => {
+    if (!currentUser) return;
+    const today = getTodayRecord();
+
+    if (!today || !today.clock_in) {
+      showToast('Anda belum melakukan Absen Masuk!', 'warning');
+      return;
+    }
+
+    if (today.clock_out) {
+      showToast('Anda sudah melakukan Absen Pulang hari ini!', 'warning');
+      return;
+    }
+
+    const currentTime = getFormattedCurrentTime();
+    const dur = calculateDuration(today.clock_in, currentTime);
+    const durationMinutes = dur ? dur.totalMinutes : 0;
+
+    try {
+      const payload = {
+        user_id: currentUser.id,
+        date: today.date,
+        status: 'Hadir',
+        clock_in: today.clock_in,
+        clock_out: currentTime,
+        duration_minutes: durationMinutes,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('attendance')
+        .upsert(payload, { onConflict: 'user_id,date' })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      Object.assign(today, data);
+      confirmPulangModal.classList.add('hidden');
+      showAbsenSuccessModal('pulang', formatTimeAmPm(currentTime));
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal Absen Pulang: ' + err.message, 'error');
+    }
+  };
+
+  // TOMBOL FLOATING FINGERPRINT ACTION
+  centerFabAbsenBtn.addEventListener('click', () => {
+    const today = getTodayRecord();
+
+    if (!today || !today.clock_in) {
+      // Belum absen masuk -> Langsung Absen Masuk
+      triggerAbsenMasuk();
+    } else if (today.clock_in && !today.clock_out) {
+      // Sedang bekerja -> Tampilkan POP-UP KONFIRMASI ABSEN PULANG
+      confirmPulangCurrentTime.textContent = `${formatTimeAmPm(getFormattedCurrentTime())} WITA`;
+      confirmPulangModal.classList.remove('hidden');
+      if (window.lucide) window.lucide.createIcons();
+    } else {
+      showToast('Absensi hari ini sudah selesai tercatat!', 'info');
+      switchTab('home');
+    }
   });
 
-  restoreDataInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  cancelConfirmPulangBtn.addEventListener('click', () => {
+    confirmPulangModal.classList.add('hidden');
+  });
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const imported = JSON.parse(event.target.result);
-        if (Array.isArray(imported)) {
-          if (confirm(`Impor ${imported.length} data absensi?`)) {
-            const existingMap = new Map(records.map((r) => [r.date, r]));
-            imported.forEach((item) => {
-              if (item.date) existingMap.set(item.date, item);
-            });
-            records = Array.from(existingMap.values());
-            records.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
-            saveRecords();
-            renderAll();
-            showToast('Data absensi berhasil dipulihkan!', 'success');
-          }
-        }
-      } catch (err) {
-        showToast('Format JSON tidak valid!', 'error');
+  proceedConfirmPulangBtn.addEventListener('click', () => {
+    triggerAbsenPulang();
+  });
+
+  confirmPulangModal.addEventListener('click', (e) => {
+    if (e.target === confirmPulangModal) confirmPulangModal.classList.add('hidden');
+  });
+
+  // Absen Success Modal
+  const showAbsenSuccessModal = (type, timeDisplay) => {
+    const isMasuk = type === 'masuk';
+    modalSuccessTitle.textContent = isMasuk ? 'Absen Masuk Berhasil!' : 'Absen Pulang Berhasil!';
+    modalSuccessTime.textContent = timeDisplay;
+    modalSuccessDate.textContent = formatDisplayDateLong(new Date());
+
+    if (isMasuk) {
+      modalSuccessBadge.className = 'w-20 h-20 mx-auto rounded-full bg-[#16A34A] text-white flex items-center justify-center shadow-xl shadow-[#16A34A]/30';
+      modalSuccessSubtitle.textContent = 'Semangat bekerja! Jangan lupa absen pulang sesuai jam kerja ya!';
+    } else {
+      modalSuccessBadge.className = 'w-20 h-20 mx-auto rounded-full bg-[#142D4E] text-white flex items-center justify-center shadow-xl shadow-[#142D4E]/30';
+      modalSuccessSubtitle.textContent = 'Terima kasih! Hari ini sudah selesai. Sampai jumpa besok!';
+    }
+
+    absenSuccessModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  };
+
+  closeSuccessModalBtn.addEventListener('click', () => {
+    absenSuccessModal.classList.add('hidden');
+    renderAll();
+  });
+
+  // --- EXPORT PDF RESMI (LAPORAN KE ATASAN) ---
+  const loadSavedPdfOfficials = () => {
+    try {
+      const saved = localStorage.getItem(PDF_INFO_KEY);
+      if (saved) {
+        const info = JSON.parse(saved);
+        if (info.namaPegawai) pdfNamaPegawai.value = info.namaPegawai;
+        if (info.nipPegawai) pdfNipPegawai.value = info.nipPegawai;
+        if (info.jabatanPegawai) pdfJabatanPegawai.value = info.jabatanPegawai;
+        if (info.namaAtasan) pdfNamaAtasan.value = info.namaAtasan;
+        if (info.nipAtasan) pdfNipAtasan.value = info.nipAtasan;
+        if (info.jabatanAtasan) pdfJabatanAtasan.value = info.jabatanAtasan;
+        if (info.kota) pdfKotaTtd.value = info.kota;
       }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  openExportPdfModalBtn.addEventListener('click', () => {
+    loadSavedPdfOfficials();
+    pdfPeriodeDisplay.value = currentPeriodLabel.textContent;
+    exportPdfModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  const closeExportPdfModal = () => {
+    exportPdfModal.classList.add('hidden');
+  };
+
+  closeExportPdfModalBtn.addEventListener('click', closeExportPdfModal);
+  cancelExportPdfBtn.addEventListener('click', closeExportPdfModal);
+  exportPdfModal.addEventListener('click', (e) => {
+    if (e.target === exportPdfModal) closeExportPdfModal();
+  });
+
+  exportPdfForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    // 1. Simpan info ke LocalStorage
+    const pdfInfo = {
+      namaPegawai: pdfNamaPegawai.value.trim(),
+      nipPegawai: pdfNipPegawai.value.trim(),
+      jabatanPegawai: pdfJabatanPegawai.value.trim() || 'Staf',
+      namaAtasan: pdfNamaAtasan.value.trim(),
+      nipAtasan: pdfNipAtasan.value.trim(),
+      jabatanAtasan: pdfJabatanAtasan.value.trim() || 'Atasan Langsung',
+      kota: pdfKotaTtd.value.trim() || 'Banjarmasin'
     };
-    reader.readAsText(file);
-    restoreDataInput.value = '';
+    localStorage.setItem(PDF_INFO_KEY, JSON.stringify(pdfInfo));
+
+    // 2. Siapkan data periode aktif
+    const year = currentHistoryPeriod.getFullYear();
+    const month = currentHistoryPeriod.getMonth();
+    const monthPrefix = `${year}-${padZero(month + 1)}`;
+    const monthRecords = records.filter((r) => r.date.startsWith(monthPrefix));
+
+    if (monthRecords.length === 0) {
+      showToast('Tidak ada data absensi untuk dicetak pada periode ini!', 'warning');
+      return;
+    }
+
+    // Sort ascending per tanggal untuk laporan resmi
+    const sortedRecords = [...monthRecords].sort((a, b) => (a.date > b.date ? 1 : -1));
+
+    // 3. Masukkan data ke template laporan cetak
+    printReportPeriodeTitle.textContent = `PERIODE: ${currentPeriodLabel.textContent.toUpperCase()}`;
+    printNamaPegawai.textContent = pdfInfo.namaPegawai;
+    printNipPegawai.textContent = pdfInfo.nipPegawai || '-';
+    printJabatanPegawai.textContent = pdfInfo.jabatanPegawai;
+
+    printNamaPegawaiBawah.textContent = pdfInfo.namaPegawai;
+    printNipPegawaiBawah.textContent = pdfInfo.nipPegawai ? `NIP. ${pdfInfo.nipPegawai}` : '-';
+
+    printNamaAtasan.textContent = pdfInfo.namaAtasan;
+    printNipAtasan.textContent = pdfInfo.nipAtasan ? `NIP. ${pdfInfo.nipAtasan}` : '-';
+    printJabatanAtasan.textContent = pdfInfo.jabatanAtasan;
+
+    const todayDate = new Date();
+    printKotaTanggalCetak.textContent = `${pdfInfo.kota}, ${formatDisplayDateLong(todayDate)}`;
+
+    // Hitung total
+    let totalHariHadir = 0;
+    let totalMinutes = 0;
+    printAttendanceTableBody.innerHTML = '';
+
+    sortedRecords.forEach((r, idx) => {
+      if (r.clock_in) totalHariHadir++;
+      let durText = '-';
+      if (r.duration_minutes) {
+        totalMinutes += r.duration_minutes;
+        const h = Math.floor(r.duration_minutes / 60);
+        const m = r.duration_minutes % 60;
+        durText = `${padZero(h)}:${padZero(m)}`;
+      } else if (r.clock_in && r.clock_out) {
+        const d = calculateDuration(r.clock_in, r.clock_out);
+        if (d) {
+          totalMinutes += d.totalMinutes;
+          durText = d.formattedText;
+        }
+      }
+
+      const [y, m, d] = r.date.split('-').map(Number);
+      const dayDate = new Date(y, m - 1, d);
+      const dayName = dayDate.toLocaleDateString('id-ID', { weekday: 'long' });
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="text-align: center;">${idx + 1}</td>
+        <td style="text-align: center;">${r.date}</td>
+        <td>${dayName}</td>
+        <td style="text-align: center;">${r.clock_in ? formatTimeAmPm(r.clock_in) : '-'}</td>
+        <td style="text-align: center;">${r.clock_out ? formatTimeAmPm(r.clock_out) : '-'}</td>
+        <td style="text-align: center;">${durText}</td>
+        <td style="text-align: center; font-weight: bold;">${r.status || 'Hadir'}</td>
+        <td>${escapeHtml(r.notes || '-')}</td>
+      `;
+      printAttendanceTableBody.appendChild(tr);
+    });
+
+    const totH = Math.floor(totalMinutes / 60);
+    const totM = totalMinutes % 60;
+    printTotalHariHadir.textContent = `${totalHariHadir} Hari`;
+    printTotalJamKerja.textContent = `${padZero(totH)}:${padZero(totM)} Jam`;
+
+    closeExportPdfModal();
+    showToast('Sedang memproses file PDF...', 'info');
+
+    // 4. Unduh PDF via html2pdf
+    if (window.html2pdf) {
+      const element = document.getElementById('printableReportContainer');
+      element.parentElement.classList.remove('hidden');
+
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Laporan_Absensi_${pdfInfo.namaPegawai.replace(/\s+/g, '_')}_${currentPeriodLabel.textContent.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      window.html2pdf().set(opt).from(element).save().then(() => {
+        element.parentElement.classList.add('hidden');
+        showToast('Laporan PDF resmi berhasil diunduh!', 'success');
+      }).catch((err) => {
+        element.parentElement.classList.add('hidden');
+        console.error(err);
+        showToast('Gagal membuat PDF: ' + err.message, 'error');
+      });
+    } else {
+      // Fallback ke window.print jika cdn tidak aktif
+      window.print();
+    }
   });
 
   // --- Theme Toggle ---
   const applyTheme = (theme) => {
-    if (theme === 'light') {
-      document.documentElement.classList.remove('dark');
-      themeIcon.setAttribute('data-lucide', 'moon');
-    } else {
+    if (theme === 'dark') {
       document.documentElement.classList.add('dark');
-      themeIcon.setAttribute('data-lucide', 'sun');
+      profileThemeIcon.setAttribute('data-lucide', 'sun');
+      profileThemeText.textContent = 'Mode Gelap (Dark)';
+    } else {
+      document.documentElement.classList.remove('dark');
+      profileThemeIcon.setAttribute('data-lucide', 'moon');
+      profileThemeText.textContent = 'Mode Terang (Light)';
     }
     localStorage.setItem(THEME_KEY, theme);
     if (window.lucide) window.lucide.createIcons();
   };
 
-  themeToggleBtn.addEventListener('click', () => {
+  themeToggleBtnProfile.addEventListener('click', () => {
     const isDark = document.documentElement.classList.contains('dark');
     applyTheme(isDark ? 'light' : 'dark');
   });
 
-  // --- PWA Installation ---
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installPwaBtn.classList.remove('hidden');
-    installPwaBtn.classList.add('flex');
-  });
-
-  installPwaBtn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      showToast('Aplikasi berhasil dipasang!', 'success');
-    }
-    deferredPrompt = null;
-    installPwaBtn.classList.add('hidden');
-    installPwaBtn.classList.remove('flex');
-  });
-
-  if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch((err) => console.log('SW error:', err));
-    });
-  }
-
-  // --- Render All ---
-  const renderAll = () => {
-    renderTodayStatus();
-    renderStatistics();
-    renderHistoryList();
+  // --- Supabase Config Modal ---
+  const openConfigModal = () => {
+    const creds = getSupabaseCredentials();
+    cfgSupabaseUrl.value = creds.url;
+    cfgSupabaseKey.value = creds.key;
+    configModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
   };
 
-  // --- Initialization ---
+  const closeConfigModal = () => {
+    configModal.classList.add('hidden');
+  };
+
+  openConfigBtnAuth.addEventListener('click', openConfigModal);
+  openConfigBtnProfile.addEventListener('click', openConfigModal);
+  closeConfigModalBtn.addEventListener('click', closeConfigModal);
+  cancelConfigModalBtn.addEventListener('click', closeConfigModal);
+  configModal.addEventListener('click', (e) => {
+    if (e.target === configModal) closeConfigModal();
+  });
+
+  configForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const url = cfgSupabaseUrl.value.trim();
+    const key = cfgSupabaseKey.value.trim();
+
+    localStorage.setItem(CFG_URL_KEY, url);
+    localStorage.setItem(CFG_KEY_KEY, key);
+
+    closeConfigModal();
+
+    if (initSupabaseClient()) {
+      showToast('Koneksi Supabase tersimpan!', 'success');
+      checkInitialAuth();
+    }
+  });
+
+  // --- Master Render Function ---
+  const renderAll = () => {
+    updateCircularTimerAndState();
+    renderWeeklyCalendar();
+    renderTaskProgressAndHomePreview();
+    renderMonthlyCalculations();
+  };
+
+  // --- Initial Auth Check ---
+  const checkInitialAuth = async () => {
+    if (!supabase) {
+      showAuthView();
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user) {
+        currentUser = session.user;
+        await loadAllDataFromCloud();
+      } else {
+        showAuthView();
+      }
+
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session && session.user) {
+          currentUser = session.user;
+          await loadAllDataFromCloud();
+        } else {
+          currentUser = null;
+          showAuthView();
+        }
+      });
+    } catch (err) {
+      console.error('Auth error:', err);
+      showAuthView();
+    }
+  };
+
+  // --- Application Initialization ---
   const init = () => {
-    const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
     applyTheme(savedTheme);
 
-    loadRecords();
-    updateClockAndGreeting();
-    setInterval(updateClockAndGreeting, 1000);
+    // Live clock & circular progress updates
+    setInterval(() => {
+      updateCircularTimerAndState();
+    }, 1000);
 
-    renderAll();
+    initSupabaseClient();
+
+    // Fade out splash screen after 1.5s
+    setTimeout(() => {
+      splashScreen.classList.add('opacity-0', 'pointer-events-none');
+      setTimeout(() => splashScreen.remove(), 500);
+      checkInitialAuth();
+    }, 1500);
+
     if (window.lucide) window.lucide.createIcons();
   };
 

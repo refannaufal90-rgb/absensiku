@@ -1,174 +1,280 @@
-/* Custom Styles for AbsensiKu Mobile-First */
+/* HadirKu Design System Stylesheet */
+/* Acuan Dribbble & Mockup Final HadirKu */
+
+:root {
+  --primary-navy: #142D4E;
+  --primary-teal: #168C85;
+  --teal-accent: #14BBA6;
+  --teal-light: #E6F7F6;
+  --success: #16845B;
+  --success-light: #EBF7EE;
+  --danger: #DC4545;
+  --danger-light: #FDECEC;
+  --warning: #F59E0B;
+  --warning-light: #FEF3C7;
+  --bg-page: #F5F7FA;
+  --surface: #FFFFFF;
+  --text-main: #172B4D;
+  --text-secondary: #64748B;
+  --border-color: #E2E8F0;
+  --card-radius: 20px;
+  --btn-radius: 14px;
+}
 
 html {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-main);
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-main);
 }
 
 .font-mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Status Button Active States */
-.status-btn {
-  background-color: rgba(30, 41, 59, 0.6);
-  border-color: rgba(51, 65, 85, 0.7);
-  color: #94a3b8;
+/* HadirKu Card Styles */
+.hadirku-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--card-radius);
+  box-shadow: 0 4px 20px -2px rgba(20, 45, 78, 0.04);
 }
 
-.status-btn:hover {
-  background-color: rgba(51, 65, 85, 0.8);
-  color: #f1f5f9;
+/* Circular Timer Progress Ring */
+.progress-ring__circle {
+  transition: stroke-dashoffset 0.5s ease-in-out;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
 }
 
-.status-btn.active-status {
-  background-color: rgba(99, 102, 241, 0.25);
-  border-color: #6366f1;
-  color: #a5b4fc;
-  box-shadow: 0 0 16px -2px rgba(99, 102, 241, 0.35);
+/* Floating Center Nav Button */
+.nav-fab {
+  width: 58px;
+  height: 58px;
+  background: linear-gradient(135deg, #14BBA6, #0D9488);
+  border-radius: 50%;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px -2px rgba(20, 187, 166, 0.45);
+  border: 4px solid #ffffff;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Task Checkbox & Animation */
+.nav-fab:active {
+  transform: scale(0.92);
+}
+
+/* Bottom Navigation Bar */
+.bottom-nav {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.05);
+}
+
+.bottom-nav-item {
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.bottom-nav-item.active {
+  color: #168C85;
+}
+
+.bottom-nav-item.active .nav-icon-wrapper {
+  background-color: #E6F7F6;
+  color: #168C85;
+}
+
+/* Weekly Calendar Item */
+.cal-day-item {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 14px;
+}
+
+.cal-day-item:hover {
+  background-color: #F1F5F9;
+}
+
+.cal-day-item.today {
+  background-color: #E6F7F6;
+  border: 1.5px solid #14BBA6;
+  color: #168C85;
+}
+
+/* Timeline Connectors */
+.timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 2px var(--border-color);
+}
+
+.timeline-line {
+  position: absolute;
+  top: 16px;
+  left: 6px;
+  bottom: -16px;
+  width: 2px;
+  background-color: #E2E8F0;
+}
+
+/* Priority Badges */
+.badge-priority-tinggi {
+  background-color: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.badge-priority-sedang {
+  background-color: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.badge-priority-rendah {
+  background-color: #E0F2FE;
+  color: #0284C7;
+  border: 1px solid #BAE6FD;
+}
+
+/* Task Checkbox & Strikethrough */
 .task-item {
   transition: all 0.2s ease;
 }
 
-.task-item:hover {
-  background-color: rgba(30, 41, 59, 0.7);
+.task-item.completed {
+  opacity: 0.65;
 }
 
-.task-item.completed-task {
-  opacity: 0.6;
-}
-
-.task-item.completed-task .task-title {
+.task-item.completed .task-title {
   text-decoration: line-through;
-  color: #94a3b8;
+  color: #94A3B8;
 }
 
-/* Light Mode Overrides */
-html:not(.dark) body {
-  background-color: #f8fafc;
-  color: #0f172a;
+/* Dark Mode Overrides */
+html.dark {
+  --bg-page: #0B1320;
+  --surface: #142033;
+  --text-main: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --border-color: #243550;
 }
 
-html:not(.dark) header {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-color: #e2e8f0;
+html.dark body {
+  background-color: #0B1320;
+  color: #F8FAFC;
 }
 
-html:not(.dark) .bg-slate-950,
-html:not(.dark) .bg-slate-900\/80,
-html:not(.dark) .bg-slate-900 {
+html.dark .hadirku-card {
+  background-color: #142033;
+  border-color: #243550;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .bottom-nav {
+  background: rgba(20, 32, 51, 0.96);
+  border-top-color: #243550;
+}
+
+html.dark .nav-fab {
+  border-color: #142033;
+}
+
+html.dark .cal-day-item:hover {
+  background-color: #1C2D47;
+}
+
+html.dark .cal-day-item.today {
+  background-color: rgba(20, 187, 166, 0.15);
+  border-color: #14BBA6;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0B1320 !important;
+  border-color: #243550 !important;
+  color: #F8FAFC !important;
+}
+
+/* Printable PDF Document Styles */
+#printableReportContainer {
+  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+  color: #000000;
   background-color: #ffffff;
-  border-color: #e2e8f0;
 }
 
-html:not(.dark) .bg-gradient-to-br {
-  background: linear-gradient(to bottom right, #ffffff, #f8fafc);
-  border-color: #e2e8f0;
+#printableReportContainer table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-html:not(.dark) .text-white {
-  color: #0f172a;
+#printableReportContainer th,
+#printableReportContainer td {
+  border: 1px solid #000000;
+  padding: 6px 8px;
+  font-size: 11px;
 }
 
-html:not(.dark) .text-slate-100 {
-  color: #1e293b;
-}
-
-html:not(.dark) .text-slate-200 {
-  color: #334155;
-}
-
-html:not(.dark) .text-slate-300 {
-  color: #475569;
-}
-
-html:not(.dark) .text-slate-400 {
-  color: #64748b;
-}
-
-html:not(.dark) .border-slate-800,
-html:not(.dark) .border-slate-800\/80,
-html:not(.dark) .border-slate-800\/90,
-html:not(.dark) .border-slate-800\/70,
-html:not(.dark) .border-slate-700,
-html:not(.dark) .border-slate-700\/60,
-html:not(.dark) .border-slate-700\/80 {
-  border-color: #e2e8f0;
-}
-
-html:not(.dark) .bg-slate-800\/60,
-html:not(.dark) .bg-slate-800,
-html:not(.dark) .bg-slate-800\/80 {
+#printableReportContainer th {
   background-color: #f1f5f9;
+  font-weight: 700;
+  text-align: center;
 }
 
-html:not(.dark) .status-btn {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
+/* Animations */
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-html:not(.dark) .status-btn.active-status {
-  background-color: #eef2ff;
-  border-color: #6366f1;
-  color: #4f46e5;
-}
-
-html:not(.dark) input,
-html:not(.dark) select {
-  background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
-}
-
-html:not(.dark) .divide-slate-800\/70 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #f1f5f9;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 9999px;
+.animate-pop-in {
+  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Toast Animations */
-@keyframes slideInUp {
+@keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translate(-50%, 20px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
 }
 
-@keyframes fadeOut {
+@keyframes toastOut {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
   to {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate(-50%, 10px);
   }
 }
 
 .toast-enter {
-  animation: slideInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .toast-leave {
-  animation: fadeOut 0.2s ease-in forwards;
+  animation: toastOut 0.2s ease-in forwards;
 }

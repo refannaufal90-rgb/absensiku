@@ -1,11 +1,11 @@
 {
-  "name": "AbsensiKu - Pencatat Kehadiran Pribadi",
-  "short_name": "AbsensiKu",
-  "description": "Aplikasi pencatat absensi dan jam kerja harian pribadi yang mudah dan praktis",
+  "name": "HadirKu - Absensi Mudah, Kerja Lebih Bermakna",
+  "short_name": "HadirKu",
+  "description": "Aplikasi absensi personal dan manajemen target tugas harian",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#4f46e5",
+  "background_color": "#F5F7FA",
+  "theme_color": "#168C85",
   "icons": [
     {
       "src": "icon.svg",
