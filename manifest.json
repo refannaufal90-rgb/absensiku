@@ -1,0 +1,17 @@
+{
+  "name": "AbsensiKu - Pencatat Kehadiran Pribadi",
+  "short_name": "AbsensiKu",
+  "description": "Aplikasi pencatat absensi dan jam kerja harian pribadi yang mudah dan praktis",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

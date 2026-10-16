@@ -1,0 +1,174 @@
+/* Custom Styles for AbsensiKu Mobile-First */
+
+html {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Status Button Active States */
+.status-btn {
+  background-color: rgba(30, 41, 59, 0.6);
+  border-color: rgba(51, 65, 85, 0.7);
+  color: #94a3b8;
+}
+
+.status-btn:hover {
+  background-color: rgba(51, 65, 85, 0.8);
+  color: #f1f5f9;
+}
+
+.status-btn.active-status {
+  background-color: rgba(99, 102, 241, 0.25);
+  border-color: #6366f1;
+  color: #a5b4fc;
+  box-shadow: 0 0 16px -2px rgba(99, 102, 241, 0.35);
+}
+
+/* Task Checkbox & Animation */
+.task-item {
+  transition: all 0.2s ease;
+}
+
+.task-item:hover {
+  background-color: rgba(30, 41, 59, 0.7);
+}
+
+.task-item.completed-task {
+  opacity: 0.6;
+}
+
+.task-item.completed-task .task-title {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+/* Light Mode Overrides */
+html:not(.dark) body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html:not(.dark) header {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: #e2e8f0;
+}
+
+html:not(.dark) .bg-slate-950,
+html:not(.dark) .bg-slate-900\/80,
+html:not(.dark) .bg-slate-900 {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+}
+
+html:not(.dark) .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #ffffff, #f8fafc);
+  border-color: #e2e8f0;
+}
+
+html:not(.dark) .text-white {
+  color: #0f172a;
+}
+
+html:not(.dark) .text-slate-100 {
+  color: #1e293b;
+}
+
+html:not(.dark) .text-slate-200 {
+  color: #334155;
+}
+
+html:not(.dark) .text-slate-300 {
+  color: #475569;
+}
+
+html:not(.dark) .text-slate-400 {
+  color: #64748b;
+}
+
+html:not(.dark) .border-slate-800,
+html:not(.dark) .border-slate-800\/80,
+html:not(.dark) .border-slate-800\/90,
+html:not(.dark) .border-slate-800\/70,
+html:not(.dark) .border-slate-700,
+html:not(.dark) .border-slate-700\/60,
+html:not(.dark) .border-slate-700\/80 {
+  border-color: #e2e8f0;
+}
+
+html:not(.dark) .bg-slate-800\/60,
+html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-slate-800\/80 {
+  background-color: #f1f5f9;
+}
+
+html:not(.dark) .status-btn {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+html:not(.dark) .status-btn.active-status {
+  background-color: #eef2ff;
+  border-color: #6366f1;
+  color: #4f46e5;
+}
+
+html:not(.dark) input,
+html:not(.dark) select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .divide-slate-800\/70 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #f1f5f9;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 9999px;
+}
+
+/* Toast Animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.toast-enter {
+  animation: slideInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-leave {
+  animation: fadeOut 0.2s ease-in forwards;
+}
